@@ -30,14 +30,31 @@ void Cpu::socket(const uint8_t positionNum, const uint8_t structLen,
     std::string result = positionToString(positionNum, structLen, dataIn);
 
     processor::socket(result);
+
+    location::locationCode(result);
 }
 
-void Cpu::family(const uint8_t value)
+static constexpr uint8_t processorFamily2Indicator = 0xfe;
+void Cpu::family(const uint8_t family, const uint16_t family2)
 {
-    std::map<uint8_t, const char*>::const_iterator it = familyTable.find(value);
+    std::map<uint8_t, const char*>::const_iterator it =
+        familyTable.find(family);
     if (it == familyTable.end())
     {
         processor::family("Unknown Processor Family");
+    }
+    else if (it->first == processorFamily2Indicator)
+    {
+        std::map<uint16_t, const char*>::const_iterator it2 =
+            family2Table.find(family2);
+        if (it2 == family2Table.end())
+        {
+            processor::family("Unknown Processor Family");
+        }
+        else
+        {
+            processor::family(it2->second);
+        }
     }
     else
     {
@@ -51,6 +68,22 @@ void Cpu::manufacturer(const uint8_t positionNum, const uint8_t structLen,
     std::string result = positionToString(positionNum, structLen, dataIn);
 
     asset::manufacturer(result);
+}
+
+void Cpu::partNumber(const uint8_t positionNum, const uint8_t structLen,
+                     uint8_t* dataIn)
+{
+    std::string result = positionToString(positionNum, structLen, dataIn);
+
+    asset::partNumber(result);
+}
+
+void Cpu::serialNumber(const uint8_t positionNum, const uint8_t structLen,
+                       uint8_t* dataIn)
+{
+    std::string result = positionToString(positionNum, structLen, dataIn);
+
+    asset::serialNumber(result);
 }
 
 void Cpu::version(const uint8_t positionNum, const uint8_t structLen,
@@ -122,13 +155,17 @@ void Cpu::infoUpdate(void)
     present(true);
 
     // this class is for type CPU  //offset 5h
-    family(cpuInfo->family); // offset 6h
+    family(cpuInfo->family, cpuInfo->family2); // offset 6h and 28h
     manufacturer(cpuInfo->manufacturer, cpuInfo->length,
                  dataIn);                               // offset 7h
     id(cpuInfo->id);                                    // offset 8h
     version(cpuInfo->version, cpuInfo->length, dataIn); // offset 10h
     maxSpeedInMhz(cpuInfo->maxSpeed);                   // offset 14h
-    if (cpuInfo->coreCount < maxOldVersionCount)        // offset 23h or 2Ah
+    serialNumber(cpuInfo->serialNum, cpuInfo->length,
+                 dataIn); // offset 20h
+    partNumber(cpuInfo->partNum, cpuInfo->length,
+               dataIn);                          // offset 22h
+    if (cpuInfo->coreCount < maxOldVersionCount) // offset 23h or 2Ah
     {
         coreCount(cpuInfo->coreCount);
     }
@@ -147,6 +184,13 @@ void Cpu::infoUpdate(void)
     }
 
     characteristics(cpuInfo->characteristics); // offset 26h
+
+    if (!motherboardPath.empty())
+    {
+        std::vector<std::tuple<std::string, std::string, std::string>> assocs;
+        assocs.emplace_back("chassis", "processors", motherboardPath);
+        association::associations(assocs);
+    }
 }
 
 } // namespace smbios

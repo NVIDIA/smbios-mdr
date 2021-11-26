@@ -16,6 +16,8 @@
 
 #include "mdrv2.hpp"
 
+#include "pcieslot.hpp"
+
 #include <sys/mman.h>
 
 #include <phosphor-logging/elog-errors.hpp>
@@ -256,7 +258,8 @@ bool MDR_V2::sendDirectoryInformation(uint8_t dirVersion, uint8_t dirIndex,
         throw sdbusplus::xyz::openbmc_project::Smbios::MDR_V2::Error::
             InvalidParameter();
     }
-    if (dirEntry.size() < sizeof(Mdr2DirEntry))
+    if ((static_cast<size_t>(returnedEntries) * sizeof(DataIdStruct)) !=
+        dirEntry.size())
     {
         phosphor::logging::log<phosphor::logging::level::ERR>(
             "Directory size invalid");
@@ -279,6 +282,7 @@ bool MDR_V2::sendDirectoryInformation(uint8_t dirVersion, uint8_t dirIndex,
             smbiosDir.dirVersion = dirVersion;
         }
         uint8_t idIndex = dirIndex;
+        smbiosDir.dirEntries = returnedEntries;
 
         uint8_t* pData = dirEntry.data();
         if (pData == nullptr)
@@ -287,15 +291,10 @@ bool MDR_V2::sendDirectoryInformation(uint8_t dirVersion, uint8_t dirIndex,
         }
         for (uint8_t index = 0; index < returnedEntries; index++)
         {
-            auto data = reinterpret_cast<const Mdr2DirEntry*>(pData);
-            smbiosDir.dir[idIndex + index].common.dataVersion =
-                data->dataVersion;
-            std::copy(data->id.dataInfo,
-                      data->id.dataInfo + sizeof(DataIdStruct),
+            auto data = reinterpret_cast<const DataIdStruct*>(pData);
+            std::copy(data->dataInfo, data->dataInfo + sizeof(DataIdStruct),
                       smbiosDir.dir[idIndex + index].common.id.dataInfo);
-            smbiosDir.dir[idIndex + index].common.dataSetSize = data->size;
-            smbiosDir.dir[idIndex + index].common.timestamp = data->timestamp;
-            pData += sizeof(returnedEntries);
+            pData += sizeof(DataIdStruct);
         }
     }
     return teminate;
@@ -376,8 +375,24 @@ uint8_t MDR_V2::directoryEntries(uint8_t value)
 
 void MDR_V2::systemInfoUpdate()
 {
-    cpus.clear();
+    std::string motherboardPath;
+    sdbusplus::message::message method =
+        bus.new_method_call("xyz.openbmc_project.EntityManager",
+                            "/xyz/openbmc_project/EntityManager",
+                            "xyz.openbmc_project.EntityManager", "ReScan");
+    try
+    {
+        sdbusplus::message::message reply = bus.call(method);
+        reply.read(motherboardPath);
+    }
+    catch (const sdbusplus::exception_t& e)
+    {
+        phosphor::logging::log<phosphor::logging::level::ERR>(
+            "Failed to query system motherboard",
+            phosphor::logging::entry("ERROR=%s", e.what()));
+    }
 
+    cpus.clear();
     int num = getTotalCpuSlot();
     if (num == -1)
     {
@@ -390,7 +405,8 @@ void MDR_V2::systemInfoUpdate()
     {
         std::string path = cpuPath + std::to_string(index);
         cpus.emplace_back(std::make_unique<phosphor::smbios::Cpu>(
-            bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage));
+            bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
+            motherboardPath));
     }
 
 #ifdef DIMM_DBUS
@@ -409,10 +425,28 @@ void MDR_V2::systemInfoUpdate()
     {
         std::string path = dimmPath + std::to_string(index);
         dimms.emplace_back(std::make_unique<phosphor::smbios::Dimm>(
-            bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage));
+            bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
+            motherboardPath));
     }
 
 #endif
+
+    pcies.clear();
+    num = getTotalPcieSlot();
+    if (num == -1)
+    {
+        phosphor::logging::log<phosphor::logging::level::ERR>(
+            "get pcie total slot failed");
+        return;
+    }
+
+    for (int index = 0; index < num; index++)
+    {
+        std::string path = pciePath + std::to_string(index);
+        pcies.emplace_back(std::make_unique<phosphor::smbios::Pcie>(
+            bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
+            motherboardPath));
+    }
 
     system.reset();
     system = std::make_unique<System>(
@@ -473,6 +507,47 @@ int MDR_V2::getTotalDimmSlot()
             break;
         }
         num++;
+        dataIn = smbiosNextPtr(dataIn);
+        if (dataIn == nullptr)
+        {
+            break;
+        }
+        if (num >= limitEntryLen)
+        {
+            break;
+        }
+    }
+
+    return num;
+}
+
+int MDR_V2::getTotalPcieSlot()
+{
+    uint8_t* dataIn = smbiosDir.dir[smbiosDirIndex].dataStorage;
+    int num = 0;
+
+    if (dataIn == nullptr)
+    {
+        phosphor::logging::log<phosphor::logging::level::ERR>(
+            "Fail to get total system slot - no storage data");
+        return -1;
+    }
+
+    while (1)
+    {
+        dataIn = getSMBIOSTypePtr(dataIn, systemSlots);
+        if (dataIn == nullptr)
+        {
+            break;
+        }
+
+        /* System slot type offset. Check if the slot is a PCIE slots. All
+         * PCIE slot type are hardcoded in a table.
+         */
+        if (pcieSmbiosType.find(*(dataIn + 5)) != pcieSmbiosType.end())
+        {
+            num++;
+        }
         dataIn = smbiosNextPtr(dataIn);
         if (dataIn == nullptr)
         {

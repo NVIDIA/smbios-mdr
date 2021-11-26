@@ -17,9 +17,13 @@
 #pragma once
 #include "smbios_mdrv2.hpp"
 
+#include <xyz/openbmc_project/Association/Definitions/server.hpp>
+#include <xyz/openbmc_project/Inventory/Connector/Slot/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Dimm/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/server.hpp>
+#include <xyz/openbmc_project/State/Decorator/OperationalStatus/server.hpp>
 
 namespace phosphor
 {
@@ -36,7 +40,16 @@ class Dimm :
     sdbusplus::server::object::object<
         sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset>,
     sdbusplus::server::object::object<
-        sdbusplus::xyz::openbmc_project::Inventory::server::Item>
+        sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
+            LocationCode>,
+    sdbusplus::server::object::object<
+        sdbusplus::xyz::openbmc_project::Inventory::Connector::server::Slot>,
+    sdbusplus::server::object::object<
+        sdbusplus::xyz::openbmc_project::Inventory::server::Item>,
+    sdbusplus::server::object::object<
+        sdbusplus::xyz::openbmc_project::Association::server::Definitions>,
+    sdbusplus::server::object::object<sdbusplus::xyz::openbmc_project::State::
+                                          Decorator::server::OperationalStatus>
 {
   public:
     Dimm() = delete;
@@ -47,7 +60,8 @@ class Dimm :
     Dimm& operator=(Dimm&&) = default;
 
     Dimm(sdbusplus::bus::bus& bus, const std::string& objPath,
-         const uint8_t& dimmId, uint8_t* smbiosTableStorage) :
+         const uint8_t& dimmId, uint8_t* smbiosTableStorage,
+         const std::string& motherboard) :
 
         sdbusplus::server::object::object<
             sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm>(
@@ -56,9 +70,22 @@ class Dimm :
             sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
                 Asset>(bus, objPath.c_str()),
         sdbusplus::server::object::object<
+            sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
+                LocationCode>(bus, objPath.c_str()),
+        sdbusplus::server::object::object<
+            sdbusplus::xyz::openbmc_project::Inventory::Connector::server::
+                Slot>(bus, objPath.c_str()),
+        sdbusplus::server::object::object<
             sdbusplus::xyz::openbmc_project::Inventory::server::Item>(
             bus, objPath.c_str()),
-        dimmNum(dimmId), storage(smbiosTableStorage)
+        sdbusplus::server::object::object<
+            sdbusplus::xyz::openbmc_project::Association::server::Definitions>(
+            bus, objPath.c_str()),
+        sdbusplus::server::object::object<
+            sdbusplus::xyz::openbmc_project::State::Decorator::server::
+                OperationalStatus>(bus, objPath.c_str()),
+        dimmNum(dimmId), storage(smbiosTableStorage),
+        motherboardPath(motherboard)
     {
         memoryInfoUpdate();
     }
@@ -75,13 +102,17 @@ class Dimm :
     bool present(bool value) override;
     std::string serialNumber(std::string value) override;
     std::string partNumber(std::string value) override;
+    std::string locationCode(std::string value) override;
     uint8_t memoryAttributes(uint8_t value) override;
     uint16_t memoryConfiguredSpeedInMhz(uint16_t value) override;
+    bool functional(bool value) override;
 
   private:
     uint8_t dimmNum;
 
     uint8_t* storage;
+
+    std::string motherboardPath;
 
     void dimmSize(const uint16_t size);
     void dimmSizeExt(const size_t size);
@@ -152,7 +183,8 @@ const std::map<uint8_t, DeviceType> dimmTypeTable = {
     {0x1a, DeviceType::DDR4},         {0x1b, DeviceType::LPDDR_SDRAM},
     {0x1c, DeviceType::LPDDR2_SDRAM}, {0x1d, DeviceType::LPDDR3_SDRAM},
     {0x1e, DeviceType::LPDDR4_SDRAM}, {0x1f, DeviceType::Logical},
-    {0x20, DeviceType::HBM},          {0x21, DeviceType::HBM2}};
+    {0x20, DeviceType::HBM},          {0x21, DeviceType::HBM2},
+    {0x22, DeviceType::DDR5},         {0x23, DeviceType::LPDDR5_SDRAM}};
 
 const std::array<std::string, 16> detailTable{
     "Reserved",      "Other",         "Unknown",     "Fast-paged",

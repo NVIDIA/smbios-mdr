@@ -17,7 +17,10 @@
 #pragma once
 #include "smbios_mdrv2.hpp"
 
+#include <xyz/openbmc_project/Association/Definitions/server.hpp>
+#include <xyz/openbmc_project/Inventory/Connector/Slot/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Cpu/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/server.hpp>
@@ -32,8 +35,14 @@ using rev =
     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Revision;
 using asset =
     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset;
+using location =
+    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::LocationCode;
+using connector =
+    sdbusplus::xyz::openbmc_project::Inventory::Connector::server::Slot;
 using processor = sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu;
 using Item = sdbusplus::xyz::openbmc_project::Inventory::server::Item;
+using association =
+    sdbusplus::xyz::openbmc_project::Association::server::Definitions;
 
 // Definition follow smbios spec DSP0134 3.0.0
 static const std::map<uint8_t, const char*> familyTable = {
@@ -67,7 +76,14 @@ static const std::map<uint8_t, const char*> familyTable = {
     {0xdd, "Dual-Core Intel Xeon processor 7xxx Series"},
     {0xde, "Quad-Core Intel Xeon processor 7xxx Series"},
     {0xdf, "Multi-Core Intel Xeon processor 7xxx Series"},
-    {0xe0, "Multi-Core Intel Xeon processor 3400 Series"}
+    {0xe0, "Multi-Core Intel Xeon processor 3400 Series"},
+    {0xfe, "Processor Family 2 Indicator"}
+
+};
+
+// Definition follow smbios spec DSP0134 3.1.1
+static const std::map<uint16_t, const char*> family2Table = {
+    {0x100, "ARMv7"}, {0x101, "ARMv8"}, {0x118, "ARM"}, {0x119, "StrongARM"}
 
 };
 
@@ -90,7 +106,9 @@ static const std::array<std::optional<processor::Capability>, 16>
                          std::nullopt,
                          std::nullopt};
 
-class Cpu : sdbusplus::server::object_t<processor, asset, rev, Item>
+class Cpu :
+    sdbusplus::server::object_t<processor, asset, location, connector, rev,
+                                Item, association>
 {
   public:
     Cpu() = delete;
@@ -101,10 +119,11 @@ class Cpu : sdbusplus::server::object_t<processor, asset, rev, Item>
     ~Cpu() = default;
 
     Cpu(sdbusplus::bus::bus& bus, const std::string& objPath,
-        const uint8_t& cpuId, uint8_t* smbiosTableStorage) :
-        sdbusplus::server::object_t<processor, asset, rev, Item>(
-            bus, objPath.c_str()),
-        cpuNum(cpuId), storage(smbiosTableStorage)
+        const uint8_t& cpuId, uint8_t* smbiosTableStorage,
+        const std::string& motherboard) :
+        sdbusplus::server::object_t<processor, asset, location, connector, rev,
+                                    Item, association>(bus, objPath.c_str()),
+        cpuNum(cpuId), storage(smbiosTableStorage), motherboardPath(motherboard)
     {
         infoUpdate();
     }
@@ -115,6 +134,8 @@ class Cpu : sdbusplus::server::object_t<processor, asset, rev, Item>
     uint8_t cpuNum;
 
     uint8_t* storage;
+
+    std::string motherboardPath;
 
     struct ProcessorInfo
     {
@@ -151,9 +172,13 @@ class Cpu : sdbusplus::server::object_t<processor, asset, rev, Item>
 
     void socket(const uint8_t positionNum, const uint8_t structLen,
                 uint8_t* dataIn);
-    void family(const uint8_t value);
+    void family(const uint8_t family, const uint16_t family2);
     void manufacturer(const uint8_t positionNum, const uint8_t structLen,
                       uint8_t* dataIn);
+    void serialNumber(const uint8_t positionNum, const uint8_t structLen,
+                      uint8_t* dataIn);
+    void partNumber(const uint8_t positionNum, const uint8_t structLen,
+                    uint8_t* dataIn);
     void version(const uint8_t positionNum, const uint8_t structLen,
                  uint8_t* dataIn);
     void characteristics(const uint16_t value);
