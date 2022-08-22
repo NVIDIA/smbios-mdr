@@ -47,6 +47,9 @@ constexpr uint32_t smbiosSMMemorySize = 1024 * 1024;
 constexpr uint32_t smbiosTableStorageSize = 64 * 1024;
 constexpr uint32_t defaultTimeout = 20000;
 
+static constexpr std::string_view anchorString21 = "_SM_";
+static constexpr std::string_view anchorString30 = "_SM3_";
+
 enum class MDR2SMBIOSStatusEnum
 {
     mdr2Init = 0,
@@ -224,6 +227,19 @@ static inline uint8_t* getSMBIOSTypePtr(uint8_t* smbiosDataIn, uint8_t typeId,
         return nullptr;
     }
     char* smbiosData = reinterpret_cast<char*>(smbiosDataIn);
+
+    // Jump to starting address of the SMBIOS Structure Table from Entry Point
+    if (std::string_view(smbiosData, anchorString30.length())
+            .compare(anchorString30) == 0)
+    {
+        auto epStructure =
+            reinterpret_cast<const EntryPointStructure30*>(smbiosData);
+        if (epStructure->structTableAddr < mdrSMBIOSSize)
+        {
+            smbiosData += epStructure->structTableAddr;
+        }
+    }
+
     while ((*smbiosData != '\0') || (*(smbiosData + 1) != '\0'))
     {
         uint32_t len = *(smbiosData + 1);

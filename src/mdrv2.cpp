@@ -583,8 +583,6 @@ int MDR_V2::getTotalPcieSlot()
 
 bool MDR_V2::checkSMBIOSVersion(uint8_t* dataIn)
 {
-    const std::string anchorString21 = "_SM_";
-    const std::string anchorString30 = "_SM3_";
     std::string buffer(dataIn, dataIn + smbiosTableStorageSize);
 
     auto it = std::search(std::begin(buffer), std::end(buffer),
