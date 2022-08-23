@@ -20,6 +20,7 @@
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Connector/Slot/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/AssetTag/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Cpu/server.hpp>
@@ -35,6 +36,8 @@ using rev =
     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Revision;
 using asset =
     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset;
+using assetTagType =
+    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::AssetTag;
 using location =
     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::LocationCode;
 using connector =
@@ -107,8 +110,8 @@ static const std::array<std::optional<processor::Capability>, 16>
                          std::nullopt};
 
 class Cpu :
-    sdbusplus::server::object_t<processor, asset, location, connector, rev,
-                                Item, association>
+    sdbusplus::server::object_t<processor, asset, assetTagType, location,
+                                connector, rev, Item, association>
 {
   public:
     Cpu() = delete;
@@ -121,8 +124,9 @@ class Cpu :
     Cpu(sdbusplus::bus::bus& bus, const std::string& objPath,
         const uint8_t& cpuId, uint8_t* smbiosTableStorage,
         const std::string& motherboard) :
-        sdbusplus::server::object_t<processor, asset, location, connector, rev,
-                                    Item, association>(bus, objPath.c_str()),
+        sdbusplus::server::object_t<processor, asset, assetTagType, location,
+                                    connector, rev, Item, association>(
+            bus, objPath.c_str()),
         cpuNum(cpuId), storage(smbiosTableStorage), motherboardPath(motherboard)
     {
         infoUpdate();
@@ -177,6 +181,8 @@ class Cpu :
                       uint8_t* dataIn);
     void serialNumber(const uint8_t positionNum, const uint8_t structLen,
                       uint8_t* dataIn);
+    void assetTagString(const uint8_t positionNum, const uint8_t structLen,
+                        uint8_t* dataIn);
     void partNumber(const uint8_t positionNum, const uint8_t structLen,
                     uint8_t* dataIn);
     void version(const uint8_t positionNum, const uint8_t structLen,
