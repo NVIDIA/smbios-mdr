@@ -114,27 +114,38 @@ if (IPMI_BLOB)
     install (TARGETS smbiosstore DESTINATION /usr/lib/ipmid-providers)
 
     if (NOT YOCTO)
-        add_dependencies (smbiosstore phosphor-host-ipmid phosphor-ipmi-blobs)
+        pkg_check_modules (IPMIHOST libipmid-host)
+        if (IPMIHOST_FOUND)
+            include_directories (${IPMIHOST_INCLUDE_DIRS})
+            link_directories (${IPMIHOST_LIBRARY_DIRS})
+        else()
+            add_dependencies (smbiosstore phosphor-host-ipmid)
+            file (MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/prefix)
+            externalproject_add (
+                phosphor-host-ipmid PREFIX ${CMAKE_BINARY_DIR}/phosphor-host-ipmid
+                GIT_REPOSITORY https://github.com/openbmc/phosphor-host-ipmid
+                SOURCE_DIR ${CMAKE_BINARY_DIR}/phosphor-host-ipmid-src
+                CONFIGURE_COMMAND cd ${CMAKE_BINARY_DIR}/phosphor-host-ipmid-src &&
+                ./bootstrap.sh && ./configure --prefix=${CMAKE_BINARY_DIR}/prefix
+                BUILD_COMMAND cd ${CMAKE_BINARY_DIR}/phosphor-host-ipmid-src && make
+                INSTALL_COMMAND cd ${CMAKE_BINARY_DIR}/phosphor-host-ipmid-src &&
+                make install LOG_DOWNLOAD ON)
+            include_directories (${CMAKE_BINARY_DIR}/prefix/include)
+            link_directories (${CMAKE_BINARY_DIR}/prefix/lib)
+        endif()
 
-        file (MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/prefix)
-        externalproject_add (
-            phosphor-host-ipmid PREFIX ${CMAKE_BINARY_DIR}/phosphor-host-ipmid
-            GIT_REPOSITORY https://github.com/openbmc/phosphor-host-ipmid
-            SOURCE_DIR ${CMAKE_BINARY_DIR}/phosphor-host-ipmid-src
-            CONFIGURE_COMMAND cd ${CMAKE_BINARY_DIR}/phosphor-host-ipmid-src &&
-            ./bootstrap.sh && ./configure --prefix=${CMAKE_BINARY_DIR}/prefix
-            BUILD_COMMAND cd ${CMAKE_BINARY_DIR}/phosphor-host-ipmid-src && make
-            INSTALL_COMMAND cd ${CMAKE_BINARY_DIR}/phosphor-host-ipmid-src &&
-            make install LOG_DOWNLOAD ON)
-        include_directories (${CMAKE_BINARY_DIR}/prefix/include)
-        link_directories (${CMAKE_BINARY_DIR}/prefix/lib)
-
-        externalproject_add (
-            phosphor-ipmi-blobs PREFIX ${CMAKE_BINARY_DIR}/phosphor-ipmi-blobs
-            GIT_REPOSITORY https://github.com/openbmc/phosphor-ipmi-blobs
-            SOURCE_DIR ${CMAKE_BINARY_DIR}/phosphor-ipmi-blobs-src
-            CONFIGURE_COMMAND "" BUILD_COMMAND "" INSTALL_COMMAND "")
-        include_directories (${CMAKE_BINARY_DIR}/phosphor-ipmi-blobs-src)
+        pkg_check_modules (IPMIBLOB phosphor-ipmi-blobs)
+        if (IPMIBLOB_FOUND)
+            include_directories (${IPMIBLOB_INCLUDE_DIRS})
+        else()
+            add_dependencies (smbiosstore phosphor-ipmi-blobs)
+            externalproject_add (
+                phosphor-ipmi-blobs PREFIX ${CMAKE_BINARY_DIR}/phosphor-ipmi-blobs
+                GIT_REPOSITORY https://github.com/openbmc/phosphor-ipmi-blobs
+                SOURCE_DIR ${CMAKE_BINARY_DIR}/phosphor-ipmi-blobs-src
+                CONFIGURE_COMMAND "" BUILD_COMMAND "" INSTALL_COMMAND "")
+            include_directories (${CMAKE_BINARY_DIR}/phosphor-ipmi-blobs-src)
+        endif()
 
         # unit tests
         set (BLOB_TEST_SRC src/smbios-ipmi-blobs/test)
