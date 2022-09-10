@@ -32,6 +32,16 @@ void Cpu::socket(const uint8_t positionNum, const uint8_t structLen,
     processor::socket(result);
 
     location::locationCode(result);
+
+    auto [found, socket, chip] = Cpu::socketChipNumber(result);
+    if (found)
+    {
+        instance::instanceNumber(chip);
+    }
+    else
+    {
+        instance::instanceNumber(cpuNum);
+    }
 }
 
 static constexpr uint8_t processorFamily2Indicator = 0xfe;

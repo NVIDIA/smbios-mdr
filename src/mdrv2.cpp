@@ -411,6 +411,69 @@ void MDR_V2::systemInfoUpdate()
             phosphor::logging::entry("ERROR=%s", e.what()));
     }
 
+    // Get ProcessorModule inventories
+    std::vector<std::pair<std::string, std::optional<size_t>>> modules;
+    std::vector<std::pair<
+        std::string,
+        std::vector<std::pair<std::string, std::vector<std::string>>>>>
+        response;
+    sdbusplus::message::message findProcModuleMethod =
+        bus.new_method_call("xyz.openbmc_project.ObjectMapper",
+                            "/xyz/openbmc_project/object_mapper",
+                            "xyz.openbmc_project.ObjectMapper", "GetSubTree");
+    findProcModuleMethod.append(
+        "/xyz/openbmc_project/inventory", 0,
+        std::array<const char*, 1>{
+            "xyz.openbmc_project.Inventory.Item.ProcessorModule"});
+    try
+    {
+        sdbusplus::message::message reply = bus.call(findProcModuleMethod);
+        reply.read(response);
+    }
+    catch (const sdbusplus::exception_t& e)
+    {
+        phosphor::logging::log<phosphor::logging::level::ERR>(
+            "Failed to query ProcessorModule",
+            phosphor::logging::entry("ERROR=%s", e.what()));
+    }
+    for (auto& [path, services] : response)
+    {
+        // instert the path with a empty instance number first
+        modules.push_back({path, {}});
+        for (auto& [service, interfaces] : services)
+        {
+            for (auto& interface : interfaces)
+            {
+                if (interface ==
+                    "xyz.openbmc_project.Inventory.Decorator.Instance")
+                {
+                    std::variant<uint64_t> instanceNumber;
+                    sdbusplus::message::message getInstanceMethod =
+                        bus.new_method_call(service.c_str(), path.c_str(),
+                                            "org.freedesktop.DBus.Properties",
+                                            "Get");
+                    getInstanceMethod.append(interface, "InstanceNumber");
+                    try
+                    {
+                        sdbusplus::message::message reply =
+                            bus.call(getInstanceMethod);
+                        reply.read(instanceNumber);
+                        // Update the instance number
+                        modules.back().second =
+                            std::get<uint64_t>(instanceNumber);
+                    }
+                    catch (const sdbusplus::exception_t& e)
+                    {
+                        phosphor::logging::log<phosphor::logging::level::ERR>(
+                            "Failed to query instanceNumber",
+                            phosphor::logging::entry("ERROR=%s", e.what()));
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
     cpus.clear();
     int num = getTotalCpuSlot();
     if (num == -1)
@@ -423,9 +486,30 @@ void MDR_V2::systemInfoUpdate()
     for (int index = 0; index < num; index++)
     {
         std::string path = cpuPath + std::to_string(index);
+        std::string cpuContainerPath = motherboardPath;
+
+        // customize path if we know the socket number
+        auto dataPtr = getSMBIOSTypeIndexPtr(
+            smbiosDir.dir[smbiosDirIndex].dataStorage, processorsType, index);
+        auto [found, socket, chip] = Cpu::socketChipNumber(dataPtr);
+        if (found && modules.size())
+        {
+            for (auto& [modulePath, moduleIntanceOpt] : modules)
+            {
+                if (modules.size() == 1 || (moduleIntanceOpt.has_value() &&
+                                            *moduleIntanceOpt == socket))
+                {
+                    // make the cpu under socket path
+                    path = modulePath + "/cpu" + std::to_string(index);
+                    cpuContainerPath = modulePath;
+                    break;
+                }
+            }
+        }
+
         cpus.emplace_back(std::make_unique<phosphor::smbios::Cpu>(
             bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
-            motherboardPath));
+            cpuContainerPath));
     }
 
 #ifdef DIMM_DBUS

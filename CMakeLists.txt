@@ -65,6 +65,12 @@ option (CPU_INFO "Add Cpuinfo Service" ON)
 
 option (YOCTO "Enable Building in Yocto" OFF)
 
+option (NVIDIA "Enable NVIDIA features" OFF)
+
+if (NVIDIA)
+    target_compile_definitions (smbiosmdrv2app PRIVATE NVIDIA)
+endif ()
+
 if (CPU_INFO)
     add_executable (cpuinfoapp src/cpuinfo_main.cpp src/speed_select.cpp
         src/cpuinfo_utils.cpp)

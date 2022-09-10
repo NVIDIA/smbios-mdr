@@ -270,6 +270,35 @@ static inline uint8_t* getSMBIOSTypePtr(uint8_t* smbiosDataIn, uint8_t typeId,
     return nullptr;
 }
 
+static inline uint8_t* getSMBIOSTypeIndexPtr(uint8_t* smbiosDataIn,
+                                             uint8_t typeId,
+                                             uint8_t targetIndex = 0)
+{
+    uint8_t* dataIn = smbiosDataIn;
+
+    dataIn = getSMBIOSTypePtr(dataIn, typeId);
+    if (dataIn == nullptr)
+    {
+        return nullptr;
+    }
+
+    for (uint8_t index = 0; index < targetIndex; index++)
+    {
+        dataIn = smbiosNextPtr(dataIn);
+        if (dataIn == nullptr)
+        {
+            return nullptr;
+        }
+        dataIn = getSMBIOSTypePtr(dataIn, typeId);
+        if (dataIn == nullptr)
+        {
+            return nullptr;
+        }
+    }
+
+    return dataIn;
+}
+
 static inline std::string positionToString(uint8_t positionNum,
                                            uint8_t structLen, uint8_t* dataIn)
 {

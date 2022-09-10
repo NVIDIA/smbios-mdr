@@ -21,10 +21,14 @@
 #include <xyz/openbmc_project/Inventory/Connector/Slot/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/AssetTag/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Instance/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/Chassis/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Cpu/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/server.hpp>
+
+#include <regex>
 
 namespace phosphor
 {
@@ -43,9 +47,13 @@ using location =
 using connector =
     sdbusplus::xyz::openbmc_project::Inventory::Connector::server::Slot;
 using processor = sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu;
+using chassis =
+    sdbusplus::xyz::openbmc_project::Inventory::Item::server::Chassis;
 using Item = sdbusplus::xyz::openbmc_project::Inventory::server::Item;
 using association =
     sdbusplus::xyz::openbmc_project::Association::server::Definitions;
+using instance =
+    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Instance;
 
 // Definition follow smbios spec DSP0134 3.0.0
 static const std::map<uint8_t, const char*> familyTable = {
@@ -111,7 +119,8 @@ static const std::array<std::optional<processor::Capability>, 16>
 
 class Cpu :
     sdbusplus::server::object_t<processor, asset, assetTagType, location,
-                                connector, rev, Item, association>
+                                connector, rev, Item, association, instance,
+                                chassis>
 {
   public:
     Cpu() = delete;
@@ -125,14 +134,57 @@ class Cpu :
         const uint8_t& cpuId, uint8_t* smbiosTableStorage,
         const std::string& motherboard) :
         sdbusplus::server::object_t<processor, asset, assetTagType, location,
-                                    connector, rev, Item, association>(
-            bus, objPath.c_str()),
+                                    connector, rev, Item, association, instance,
+                                    chassis>(bus, objPath.c_str()),
         cpuNum(cpuId), storage(smbiosTableStorage), motherboardPath(motherboard)
     {
         infoUpdate();
     }
 
     void infoUpdate(void);
+
+    static inline auto socketChipNumber(const std::string socketDesignation)
+    {
+        bool found = false;
+        size_t socket = 0;
+        size_t chip = 0;
+#ifdef NVIDIA
+        const std::regex socketRegex("(\\w+):(\\d+)\\.(\\d+)\\s*");
+        std::smatch match;
+
+        found = std::regex_match(socketDesignation, match, socketRegex);
+        if (found)
+        {
+            try
+            {
+                socket = std::stoul(match[2]);
+                chip = std::stoul(match[3]);
+            }
+            catch (std::exception& e)
+            {
+                found = false;
+            }
+        }
+#endif
+        return std::make_tuple(found, socket, chip);
+    }
+
+    static inline auto socketChipNumber(uint8_t* dataIn)
+    {
+        bool found = false;
+        size_t socket = 0;
+        size_t chip = 0;
+
+        if (dataIn == nullptr)
+        {
+            return std::make_tuple(found, socket, chip);
+        }
+
+        auto cpuInfo = reinterpret_cast<struct Cpu::ProcessorInfo*>(dataIn);
+        std::string socketDesignation = positionToString(
+            cpuInfo->socketDesignation, cpuInfo->length, dataIn);
+        return socketChipNumber(socketDesignation);
+    }
 
   private:
     uint8_t cpuNum;
