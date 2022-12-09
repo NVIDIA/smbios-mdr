@@ -60,6 +60,19 @@ class Pcie :
     uint8_t* storage;
     std::string motherboardPath;
 
+    static constexpr uint8_t slotLengthShort = 0x03;
+    static constexpr uint8_t slotLengthLong = 0x04;
+    static constexpr uint8_t slotHeightNotApplicable = 0x00;
+    static constexpr uint8_t slotHeightLowProfile = 0x04;
+
+    struct PeerGroup
+    {
+        uint16_t segGroupNum;
+        uint8_t busNum;
+        uint8_t deviceNum;
+        uint8_t dataBusWidth;
+    } __attribute__((packed));
+
     struct SystemSlotInfo
     {
         uint8_t type;
@@ -76,10 +89,21 @@ class Pcie :
         uint16_t segGroupNum;
         uint8_t busNum;
         uint8_t deviceNum;
+        uint8_t dataBusWidth;
+        uint8_t peerGorupingCount;
+        PeerGroup peerGroups[];
+    } __attribute__((packed));
+
+    struct SystemSlotInfoAfterPeerGroups
+    {
+        uint8_t slotInformation;
+        uint8_t slotPhysicalWidth;
+        uint16_t slotPitch;
+        uint8_t slotHeight;
     } __attribute__((packed));
 
     void pcieGeneration(const uint8_t type);
-    void pcieType(const uint8_t type);
+    void pcieType(const uint8_t type, const uint8_t length, const uint8_t height);
     void pcieLaneSize(const uint8_t width);
     void pcieIsHotPluggable(const uint8_t characteristics);
     void pcieLocation(const uint8_t slotDesignation, const uint8_t structLen,

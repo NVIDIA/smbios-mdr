@@ -396,13 +396,27 @@ void MDR_V2::systemInfoUpdate()
 {
     std::string motherboardPath;
     sdbusplus::message::message method =
-        bus.new_method_call("xyz.openbmc_project.EntityManager",
-                            "/xyz/openbmc_project/EntityManager",
-                            "xyz.openbmc_project.EntityManager", "ReScan");
+        bus.new_method_call("xyz.openbmc_project.ObjectMapper",
+                            "/xyz/openbmc_project/object_mapper",
+                            "xyz.openbmc_project.ObjectMapper", "GetSubTreePaths");
+    method.append("/xyz/openbmc_project/inventory");
+    method.append(int32_t(0));
+    method.append(std::array<const char*, 1>({"xyz.openbmc_project.Inventory.Item.System"}));
     try
     {
         sdbusplus::message::message reply = bus.call(method);
-        reply.read(motherboardPath);
+        std::vector<std::string> pathes;
+        reply.read(pathes);
+        if (pathes.size() > 0)
+        {
+            motherboardPath = pathes[0];
+        }
+        else
+        {
+            phosphor::logging::log<phosphor::logging::level::ERR>(
+                "Failed to query system motherboard",
+                phosphor::logging::entry("ERROR=%s", "Item.System not found"));
+        }
     }
     catch (const sdbusplus::exception_t& e)
     {
@@ -546,6 +560,10 @@ void MDR_V2::systemInfoUpdate()
     for (int index = 0; index < num; index++)
     {
         std::string path = pciePath + std::to_string(index);
+        if (!motherboardPath.empty() && path.starts_with(defaultMotherboardPath))
+        {
+            path.replace(0, strlen(defaultMotherboardPath), motherboardPath);
+        }
         pcies.emplace_back(std::make_unique<phosphor::smbios::Pcie>(
             bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
             motherboardPath));
