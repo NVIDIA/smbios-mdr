@@ -17,8 +17,10 @@
 #pragma once
 #include "smbios_mdrv2.hpp"
 
+#include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
+#include <xyz/openbmc_project/Software/Version/server.hpp>
 
 namespace phosphor
 {
@@ -26,11 +28,15 @@ namespace phosphor
 namespace smbios
 {
 
-class System :
-    sdbusplus::server::object::object<
-        sdbusplus::xyz::openbmc_project::Common::server::UUID>,
-    sdbusplus::server::object::object<
-        sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Revision>
+using uuidIntf = sdbusplus::server::object::object<
+    sdbusplus::xyz::openbmc_project::Common::server::UUID>;
+using revisionIntf = sdbusplus::server::object::object<
+    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Revision>;
+using associationIntf = sdbusplus::server::object::object<
+    sdbusplus::xyz::openbmc_project::Association::server::Definitions>;
+using softwareversionIntf = sdbusplus::server::object::object<
+    sdbusplus::xyz::openbmc_project::Software::server::Version>;
+class System : uuidIntf, revisionIntf, associationIntf, softwareversionIntf
 {
   public:
     System() = delete;
@@ -42,17 +48,21 @@ class System :
 
     System(sdbusplus::bus::bus& bus, const std::string& objPath,
            uint8_t* smbiosTableStorage) :
-        sdbusplus::server::object::object<
-            sdbusplus::xyz::openbmc_project::Common::server::UUID>(
-            bus, objPath.c_str()),
-        sdbusplus::server::object::object<
-            sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
-                Revision>(bus, objPath.c_str()),
-        path(objPath), storage(smbiosTableStorage)
+        uuidIntf(bus, objPath.c_str()),
+        revisionIntf(bus, objPath.c_str()),
+        associationIntf(bus, objPath.c_str()),
+        softwareversionIntf(bus, objPath.c_str()), path(objPath),
+        storage(smbiosTableStorage)
     {
         std::string input = "0";
         uuid(input);
         version("0.00");
+        std::vector<std::tuple<std::string, std::string, std::string>>
+            biosAssociation = {{"software_version", "functional",
+                                "/xyz/openbmc_project/software"}};
+        associationIntf::associations(biosAssociation);
+        softwareversionIntf::purpose(softwareversionIntf::VersionPurpose::Host);
+        softwareversionIntf::version(revisionIntf::version());
     }
 
     std::string uuid(std::string value) override;

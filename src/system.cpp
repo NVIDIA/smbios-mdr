@@ -93,6 +93,7 @@ std::string System::version(std::string value)
         result = tempS;
     }
     lg2::info("VERSION INFO - BIOS - {VER}", "VER", result);
+    softwareversionIntf::version(result);
     return sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
         Revision::version(result);
 }

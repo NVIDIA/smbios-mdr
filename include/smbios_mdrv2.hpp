@@ -170,11 +170,11 @@ static constexpr const char* dimmPath =
 static constexpr const char* pciePath =
     "/xyz/openbmc_project/inventory/system/chassis/motherboard/pcieslot";
 
-static constexpr const char* systemPath =
-    "/xyz/openbmc_project/inventory/system/chassis/motherboard/bios";
+static constexpr const char* systemPath = "/xyz/openbmc_project/software/bios";
 
 constexpr std::array<SMBIOSVersion, 4> supportedSMBIOSVersions{
-    SMBIOSVersion{3, 0}, SMBIOSVersion{3, 2}, SMBIOSVersion{3, 3}, SMBIOSVersion{3, 5}};
+    SMBIOSVersion{3, 0}, SMBIOSVersion{3, 2}, SMBIOSVersion{3, 3},
+    SMBIOSVersion{3, 5}};
 
 typedef enum
 {
