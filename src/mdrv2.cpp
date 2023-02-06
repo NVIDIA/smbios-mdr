@@ -395,13 +395,14 @@ uint8_t MDR_V2::directoryEntries(uint8_t value)
 void MDR_V2::systemInfoUpdate()
 {
     std::string motherboardPath;
-    sdbusplus::message::message method =
-        bus.new_method_call("xyz.openbmc_project.ObjectMapper",
-                            "/xyz/openbmc_project/object_mapper",
-                            "xyz.openbmc_project.ObjectMapper", "GetSubTreePaths");
+    sdbusplus::message::message method = bus.new_method_call(
+        "xyz.openbmc_project.ObjectMapper",
+        "/xyz/openbmc_project/object_mapper",
+        "xyz.openbmc_project.ObjectMapper", "GetSubTreePaths");
     method.append("/xyz/openbmc_project/inventory");
     method.append(int32_t(0));
-    method.append(std::array<const char*, 1>({"xyz.openbmc_project.Inventory.Item.System"}));
+    method.append(std::array<const char*, 1>(
+        {"xyz.openbmc_project.Inventory.Item.System"}));
     try
     {
         sdbusplus::message::message reply = bus.call(method);
@@ -560,7 +561,8 @@ void MDR_V2::systemInfoUpdate()
     for (int index = 0; index < num; index++)
     {
         std::string path = pciePath + std::to_string(index);
-        if (!motherboardPath.empty() && path.starts_with(defaultMotherboardPath))
+        if (!motherboardPath.empty() &&
+            path.starts_with(defaultMotherboardPath))
         {
             path.replace(0, strlen(defaultMotherboardPath), motherboardPath);
         }
@@ -572,6 +574,19 @@ void MDR_V2::systemInfoUpdate()
     system.reset();
     system = std::make_unique<System>(
         bus, systemPath, smbiosDir.dir[smbiosDirIndex].dataStorage);
+
+    tpm.reset();
+    if (getTotalNum(tpmDeviceType) == 1)
+    {
+        std::string path = tpmPath;
+        if (!motherboardPath.empty() &&
+            path.starts_with(defaultMotherboardPath))
+        {
+            path.replace(0, strlen(defaultMotherboardPath), motherboardPath);
+        }
+        tpm = std::make_unique<Tpm>(bus, path,
+                                    smbiosDir.dir[smbiosDirIndex].dataStorage);
+    }
 }
 
 int MDR_V2::getTotalCpuSlot()
@@ -669,6 +684,40 @@ int MDR_V2::getTotalPcieSlot()
         {
             num++;
         }
+        dataIn = smbiosNextPtr(dataIn);
+        if (dataIn == nullptr)
+        {
+            break;
+        }
+        if (num >= limitEntryLen)
+        {
+            break;
+        }
+    }
+
+    return num;
+}
+
+int MDR_V2::getTotalNum(uint8_t typeId, size_t minSize)
+{
+    uint8_t* dataIn = smbiosDir.dir[smbiosDirIndex].dataStorage;
+    uint8_t num = 0;
+
+    if (dataIn == nullptr)
+    {
+        phosphor::logging::log<phosphor::logging::level::ERR>(
+            "no storage data");
+        return -1;
+    }
+
+    while (1)
+    {
+        dataIn = getSMBIOSTypePtr(dataIn, typeId, minSize);
+        if (dataIn == nullptr)
+        {
+            break;
+        }
+        num++;
         dataIn = smbiosNextPtr(dataIn);
         if (dataIn == nullptr)
         {

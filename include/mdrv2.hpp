@@ -20,6 +20,7 @@
 #include "pcieslot.hpp"
 #include "smbios_mdrv2.hpp"
 #include "system.hpp"
+#include "tpm.hpp"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -171,10 +172,12 @@ class MDR_V2 :
     int getTotalCpuSlot(void);
     int getTotalDimmSlot(void);
     int getTotalPcieSlot(void);
+    int getTotalNum(uint8_t typeId, size_t minSize = 0);
     std::vector<std::unique_ptr<Cpu>> cpus;
     std::vector<std::unique_ptr<Dimm>> dimms;
     std::vector<std::unique_ptr<Pcie>> pcies;
     std::unique_ptr<System> system;
+    std::unique_ptr<Tpm> tpm;
     std::shared_ptr<sdbusplus::asio::dbus_interface> smbiosInterface;
     std::unique_ptr<sdbusplus::bus::match_t> interfaceAddedMatch;
 };
