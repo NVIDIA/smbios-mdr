@@ -50,10 +50,18 @@ static constexpr const char* mdrV2Path = "/xyz/openbmc_project/Smbios/MDR_V2";
 static constexpr const char* smbiosPath = "/xyz/openbmc_project/Smbios";
 static constexpr const char* smbiosInterfaceName =
     "xyz.openbmc_project.Smbios.GetRecordType";
+static constexpr const char* mapperBusName = "xyz.openbmc_project.ObjectMapper";
+static constexpr const char* mapperPath = "/xyz/openbmc_project/object_mapper";
+static constexpr const char* mapperInterface =
+    "xyz.openbmc_project.ObjectMapper";
+static constexpr const char* systemInterfacePath =
+    "/xyz/openbmc_project/inventory/system";
+static constexpr const char* systemInterface =
+    "xyz.openbmc_project.Inventory.Item.System";
 constexpr const int limitEntryLen = 0xff;
 
 class MDR_V2 :
-    sdbusplus::server::object::object<
+    sdbusplus::server::object_t<
         sdbusplus::xyz::openbmc_project::Smbios::server::MDR_V2>
 {
   public:
@@ -64,9 +72,9 @@ class MDR_V2 :
     MDR_V2& operator=(MDR_V2&&) = delete;
     ~MDR_V2() = default;
 
-    MDR_V2(sdbusplus::bus::bus& bus, const char* path,
+    MDR_V2(sdbusplus::bus_t& bus, const char* path,
            boost::asio::io_context& io) :
-        sdbusplus::server::object::object<
+        sdbusplus::server::object_t<
             sdbusplus::xyz::openbmc_project::Smbios::server::MDR_V2>(bus, path),
         bus(bus), timer(io), smbiosInterface(getObjectServer().add_interface(
                                  smbiosPath, smbiosInterfaceName))
@@ -153,7 +161,7 @@ class MDR_V2 :
   private:
     boost::asio::steady_timer timer;
 
-    sdbusplus::bus::bus& bus;
+    sdbusplus::bus_t& bus;
 
     Mdr2DirStruct smbiosDir;
 

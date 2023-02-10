@@ -395,28 +395,24 @@ uint8_t MDR_V2::directoryEntries(uint8_t value)
 void MDR_V2::systemInfoUpdate()
 {
     std::string motherboardPath;
-    sdbusplus::message::message method = bus.new_method_call(
-        "xyz.openbmc_project.ObjectMapper",
-        "/xyz/openbmc_project/object_mapper",
-        "xyz.openbmc_project.ObjectMapper", "GetSubTreePaths");
-    method.append("/xyz/openbmc_project/inventory");
-    method.append(int32_t(0));
-    method.append(std::array<const char*, 1>(
-        {"xyz.openbmc_project.Inventory.Item.System"}));
+    auto method = bus.new_method_call(mapperBusName, mapperPath,
+                                      mapperInterface, "GetSubTreePaths");
+    method.append(systemInterfacePath);
+    method.append(0);
+    method.append(std::vector<std::string>({systemInterface}));
     try
     {
-        sdbusplus::message::message reply = bus.call(method);
-        std::vector<std::string> pathes;
-        reply.read(pathes);
-        if (pathes.size() > 0)
+        std::vector<std::string> paths;
+        sdbusplus::message_t reply = bus.call(method);
+        reply.read(paths);
+        if (paths.size() < 1)
         {
-            motherboardPath = pathes[0];
+            phosphor::logging::log<phosphor::logging::level::ERR>(
+                "Failed to get system motherboard dbus path.");
         }
         else
         {
-            phosphor::logging::log<phosphor::logging::level::ERR>(
-                "Failed to query system motherboard",
-                phosphor::logging::entry("ERROR=%s", "Item.System not found"));
+            motherboardPath = std::move(paths[0]);
         }
     }
     catch (const sdbusplus::exception_t& e)
@@ -432,7 +428,7 @@ void MDR_V2::systemInfoUpdate()
         std::string,
         std::vector<std::pair<std::string, std::vector<std::string>>>>>
         response;
-    sdbusplus::message::message findProcModuleMethod =
+    sdbusplus::message_t findProcModuleMethod =
         bus.new_method_call("xyz.openbmc_project.ObjectMapper",
                             "/xyz/openbmc_project/object_mapper",
                             "xyz.openbmc_project.ObjectMapper", "GetSubTree");
@@ -442,7 +438,7 @@ void MDR_V2::systemInfoUpdate()
             "xyz.openbmc_project.Inventory.Item.ProcessorModule"});
     try
     {
-        sdbusplus::message::message reply = bus.call(findProcModuleMethod);
+        sdbusplus::message_t reply = bus.call(findProcModuleMethod);
         reply.read(response);
     }
     catch (const sdbusplus::exception_t& e)
@@ -463,14 +459,14 @@ void MDR_V2::systemInfoUpdate()
                     "xyz.openbmc_project.Inventory.Decorator.Instance")
                 {
                     std::variant<uint64_t> instanceNumber;
-                    sdbusplus::message::message getInstanceMethod =
+                    sdbusplus::message_t getInstanceMethod =
                         bus.new_method_call(service.c_str(), path.c_str(),
                                             "org.freedesktop.DBus.Properties",
                                             "Get");
                     getInstanceMethod.append(interface, "InstanceNumber");
                     try
                     {
-                        sdbusplus::message::message reply =
+                        sdbusplus::message_t reply =
                             bus.call(getInstanceMethod);
                         reply.read(instanceNumber);
                         // Update the instance number

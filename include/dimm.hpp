@@ -34,22 +34,24 @@ namespace smbios
 using DeviceType =
     sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::DeviceType;
 
+using EccType =
+    sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::Ecc;
+
 class Dimm :
-    sdbusplus::server::object::object<
+    sdbusplus::server::object_t<
         sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm>,
-    sdbusplus::server::object::object<
+    sdbusplus::server::object_t<
         sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset>,
-    sdbusplus::server::object::object<
-        sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
-            LocationCode>,
-    sdbusplus::server::object::object<
+    sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
+                                    Decorator::server::LocationCode>,
+    sdbusplus::server::object_t<
         sdbusplus::xyz::openbmc_project::Inventory::Connector::server::Slot>,
-    sdbusplus::server::object::object<
+    sdbusplus::server::object_t<
         sdbusplus::xyz::openbmc_project::Inventory::server::Item>,
-    sdbusplus::server::object::object<
+    sdbusplus::server::object_t<
         sdbusplus::xyz::openbmc_project::Association::server::Definitions>,
-    sdbusplus::server::object::object<sdbusplus::xyz::openbmc_project::State::
-                                          Decorator::server::OperationalStatus>
+    sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::State::
+                                    Decorator::server::OperationalStatus>
 {
   public:
     Dimm() = delete;
@@ -59,31 +61,31 @@ class Dimm :
     Dimm(Dimm&&) = default;
     Dimm& operator=(Dimm&&) = default;
 
-    Dimm(sdbusplus::bus::bus& bus, const std::string& objPath,
+    Dimm(sdbusplus::bus_t& bus, const std::string& objPath,
          const uint8_t& dimmId, uint8_t* smbiosTableStorage,
          const std::string& motherboard) :
 
-        sdbusplus::server::object::object<
+        sdbusplus::server::object_t<
             sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm>(
             bus, objPath.c_str()),
-        sdbusplus::server::object::object<
-            sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
-                Asset>(bus, objPath.c_str()),
-        sdbusplus::server::object::object<
-            sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
-                LocationCode>(bus, objPath.c_str()),
-        sdbusplus::server::object::object<
-            sdbusplus::xyz::openbmc_project::Inventory::Connector::server::
-                Slot>(bus, objPath.c_str()),
-        sdbusplus::server::object::object<
+        sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
+                                        Decorator::server::Asset>(
+            bus, objPath.c_str()),
+        sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
+                                        Decorator::server::LocationCode>(
+            bus, objPath.c_str()),
+        sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
+                                        Connector::server::Slot>(
+            bus, objPath.c_str()),
+        sdbusplus::server::object_t<
             sdbusplus::xyz::openbmc_project::Inventory::server::Item>(
             bus, objPath.c_str()),
-        sdbusplus::server::object::object<
+        sdbusplus::server::object_t<
             sdbusplus::xyz::openbmc_project::Association::server::Definitions>(
             bus, objPath.c_str()),
-        sdbusplus::server::object::object<
-            sdbusplus::xyz::openbmc_project::State::Decorator::server::
-                OperationalStatus>(bus, objPath.c_str()),
+        sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::State::
+                                        Decorator::server::OperationalStatus>(
+            bus, objPath.c_str()),
         dimmNum(dimmId), storage(smbiosTableStorage),
         motherboardPath(motherboard)
     {
@@ -106,6 +108,7 @@ class Dimm :
     uint8_t memoryAttributes(uint8_t value) override;
     uint16_t memoryConfiguredSpeedInMhz(uint16_t value) override;
     bool functional(bool value) override;
+    EccType ecc(EccType value) override;
 
   private:
     uint8_t dimmNum;
@@ -116,8 +119,9 @@ class Dimm :
 
     void dimmSize(const uint16_t size);
     void dimmSizeExt(const size_t size);
-    void dimmDeviceLocator(const uint8_t positionNum, const uint8_t structLen,
-                           uint8_t* dataIn);
+    void dimmDeviceLocator(const uint8_t bankLocatorPositionNum,
+                           const uint8_t deviceLocatorPositionNum,
+                           const uint8_t structLen, uint8_t* dataIn);
     void dimmType(const uint8_t type);
     void dimmTypeDetail(const uint16_t detail);
     void dimmManufacturer(const uint8_t positionNum, const uint8_t structLen,
@@ -126,6 +130,7 @@ class Dimm :
                        uint8_t* dataIn);
     void dimmPartNum(const uint8_t positionNum, const uint8_t structLen,
                      uint8_t* dataIn);
+    void updateEccType(uint16_t exPhyArrayHandle);
 };
 
 struct MemoryInfo
@@ -168,6 +173,25 @@ struct MemoryInfo
     uint64_t logicalSize;
 } __attribute__((packed));
 
+/**
+ * @brief Struct to represent SMBIOS 3.2 type-16 (Physical Memory Array) data.
+ */
+struct PhysicalMemoryArrayInfo
+{
+    uint8_t type;
+    uint8_t length;
+    uint16_t handle;
+    uint8_t location;
+    uint8_t use;
+    uint8_t memoryErrorCorrection;
+    uint32_t maximumCapacity;
+    uint16_t memoryErrorInformationHandle;
+    uint16_t numberOfMemoryDevices;
+    uint64_t extendedMaximumCapacity;
+} __attribute__((packed));
+static_assert(sizeof(PhysicalMemoryArrayInfo) == 23,
+              "Size of PhysicalMemoryArrayInfo struct is incorrect.");
+
 const std::map<uint8_t, DeviceType> dimmTypeTable = {
     {0x1, DeviceType::Other},         {0x2, DeviceType::Unknown},
     {0x3, DeviceType::DRAM},          {0x4, DeviceType::EDRAM},
@@ -191,6 +215,20 @@ const std::array<std::string, 16> detailTable{
     "Static column", "Pseudo-static", "RAMBUS",      "Synchronous",
     "CMOS",          "EDO",           "Window DRAM", "Cache DRAM",
     "Non-volatile",  "Registered",    "Unbuffered",  "LRDIMM"};
+
+/**
+ * @brief Map SMBIOS 3.2 Memory Array Error Correction Types to
+ * xyz.openbmc_project.Inventory.Item.Dimm.Ecc types.
+ *
+ * SMBIOS 3.2 Memory Array Error Correction Types 'Unknown', 'None', 'CRC' are
+ * mapped to EccType::NoECC since the DBUs interface does not support those
+ * representations.
+ */
+const std::map<uint8_t, EccType> dimmEccTypeMap = {
+    {0x1, EccType::NoECC},        {0x2, EccType::NoECC},
+    {0x3, EccType::NoECC},        {0x4, EccType::AddressParity},
+    {0x5, EccType::SingleBitECC}, {0x6, EccType::MultiBitECC},
+    {0x7, EccType::NoECC}};
 
 } // namespace smbios
 

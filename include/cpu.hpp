@@ -130,9 +130,8 @@ class Cpu :
     Cpu& operator=(Cpu&&) = delete;
     ~Cpu() = default;
 
-    Cpu(sdbusplus::bus::bus& bus, const std::string& objPath,
-        const uint8_t& cpuId, uint8_t* smbiosTableStorage,
-        const std::string& motherboard) :
+    Cpu(sdbusplus::bus_t& bus, const std::string& objPath, const uint8_t& cpuId,
+        uint8_t* smbiosTableStorage, const std::string& motherboard) :
         sdbusplus::server::object_t<processor, asset, assetTagType, location,
                                     connector, rev, Item, association, instance,
                                     chassis>(bus, objPath.c_str()),

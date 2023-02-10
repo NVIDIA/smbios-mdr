@@ -28,13 +28,13 @@ namespace phosphor
 namespace smbios
 {
 
-using uuidIntf = sdbusplus::server::object::object<
+using uuidIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Common::server::UUID>;
-using revisionIntf = sdbusplus::server::object::object<
+using revisionIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Revision>;
-using associationIntf = sdbusplus::server::object::object<
+using associationIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Association::server::Definitions>;
-using softwareversionIntf = sdbusplus::server::object::object<
+using softwareversionIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Software::server::Version>;
 class System : uuidIntf, revisionIntf, associationIntf, softwareversionIntf
 {
@@ -46,12 +46,12 @@ class System : uuidIntf, revisionIntf, associationIntf, softwareversionIntf
     System(System&&) = default;
     System& operator=(System&&) = default;
 
-    System(sdbusplus::bus::bus& bus, const std::string& objPath,
+    System(sdbusplus::bus_t& bus, const std::string& objPath,
            uint8_t* smbiosTableStorage) :
         uuidIntf(bus, objPath.c_str()),
         revisionIntf(bus, objPath.c_str()),
         associationIntf(bus, objPath.c_str()),
-        softwareversionIntf(bus, objPath.c_str()), path(objPath),
+        softwareversionIntf(bus, objPath.c_str()), bus(bus), path(objPath),
         storage(smbiosTableStorage)
     {
         std::string input = "0";
@@ -68,6 +68,7 @@ class System : uuidIntf, revisionIntf, associationIntf, softwareversionIntf
     std::string uuid(std::string value) override;
 
     std::string version(std::string value) override;
+    sdbusplus::bus_t& bus;
 
   private:
     /** @brief Path of the group instance */

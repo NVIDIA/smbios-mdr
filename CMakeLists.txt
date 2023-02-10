@@ -61,6 +61,13 @@ install (TARGETS smbiosmdrv2app DESTINATION bin)
 install (FILES  ${PROJECT_SOURCE_DIR}/service_files/smbios-mdrv2.service
     DESTINATION /lib/systemd/system/)
 
+option (DIMM_ONLY_LOCATOR "Only use the DIMM number, and not the bank" OFF)
+
+if (DIMM_ONLY_LOCATOR)
+    target_compile_definitions (smbiosmdrv2app PRIVATE DIMM_ONLY_LOCATOR)
+endif ()
+
+
 option (CPU_INFO "Add Cpuinfo Service" ON)
 
 option (YOCTO "Enable Building in Yocto" OFF)
@@ -73,6 +80,7 @@ endif ()
 
 if (CPU_INFO)
     add_executable (cpuinfoapp src/cpuinfo_main.cpp src/speed_select.cpp
+        src/sst_mailbox.cpp
         src/cpuinfo_utils.cpp)
     target_link_libraries (cpuinfoapp ${SYSTEMD_LIBRARIES})
     target_link_libraries (cpuinfoapp ${DBUSINTERFACE_LIBRARIES})
@@ -126,16 +134,20 @@ if (IPMI_BLOB)
             link_directories (${IPMIHOST_LIBRARY_DIRS})
         else()
             add_dependencies (smbiosstore phosphor-host-ipmid)
+
             file (MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/prefix)
             externalproject_add (
-                phosphor-host-ipmid PREFIX ${CMAKE_BINARY_DIR}/phosphor-host-ipmid
+                phosphor-host-ipmid
+                PREFIX ${CMAKE_BINARY_DIR}/phosphor-host-ipmid
                 GIT_REPOSITORY https://github.com/openbmc/phosphor-host-ipmid
                 SOURCE_DIR ${CMAKE_BINARY_DIR}/phosphor-host-ipmid-src
-                CONFIGURE_COMMAND cd ${CMAKE_BINARY_DIR}/phosphor-host-ipmid-src &&
-                ./bootstrap.sh && ./configure --prefix=${CMAKE_BINARY_DIR}/prefix
-                BUILD_COMMAND cd ${CMAKE_BINARY_DIR}/phosphor-host-ipmid-src && make
-                INSTALL_COMMAND cd ${CMAKE_BINARY_DIR}/phosphor-host-ipmid-src &&
-                make install LOG_DOWNLOAD ON)
+                CONFIGURE_COMMAND cd ${CMAKE_BINARY_DIR}/phosphor-host-ipmid-src
+                    && meson --prefix=${CMAKE_BINARY_DIR}/prefix build-ext
+                BUILD_COMMAND cd ${CMAKE_BINARY_DIR}/phosphor-host-ipmid-src
+                    && ninja -C build-ext
+                INSTALL_COMMAND cd ${CMAKE_BINARY_DIR}/phosphor-host-ipmid-src
+                    && ninja -C build-ext install
+                LOG_DOWNLOAD ON)
             include_directories (${CMAKE_BINARY_DIR}/prefix/include)
             link_directories (${CMAKE_BINARY_DIR}/prefix/lib)
         endif()
@@ -145,6 +157,7 @@ if (IPMI_BLOB)
             include_directories (${IPMIBLOB_INCLUDE_DIRS})
         else()
             add_dependencies (smbiosstore phosphor-ipmi-blobs)
+
             externalproject_add (
                 phosphor-ipmi-blobs PREFIX ${CMAKE_BINARY_DIR}/phosphor-ipmi-blobs
                 GIT_REPOSITORY https://github.com/openbmc/phosphor-ipmi-blobs

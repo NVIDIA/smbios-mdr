@@ -64,11 +64,13 @@ void Cpu::family(const uint8_t family, const uint16_t family2)
         else
         {
             processor::family(it2->second);
+            processor::effectiveFamily(family2);
         }
     }
     else
     {
         processor::family(it->second);
+        processor::effectiveFamily(family);
     }
 }
 

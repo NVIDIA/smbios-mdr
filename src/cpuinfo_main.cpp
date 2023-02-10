@@ -25,6 +25,7 @@
 
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/steady_timer.hpp>
+#include <boost/container/flat_map.hpp>
 
 #include <iostream>
 #include <list>
@@ -319,11 +320,11 @@ static void createCpuUpdatedMatch(
 
     cpuUpdatedMatch.insert_or_assign(
         cpu,
-        std::make_unique<sdbusplus::bus::match::match>(
-            static_cast<sdbusplus::bus::bus&>(*conn),
+        std::make_unique<sdbusplus::bus::match_t>(
+            static_cast<sdbusplus::bus_t&>(*conn),
             sdbusplus::bus::match::rules::interfacesAdded() +
                 sdbusplus::bus::match::rules::argNpath(0, objectPath.c_str()),
-            [conn, cpu](sdbusplus::message::message& msg) {
+            [conn, cpu](sdbusplus::message_t& msg) {
                 sdbusplus::message::object_path objectName;
                 boost::container::flat_map<
                     std::string,
@@ -561,13 +562,13 @@ static void getCpuConfiguration(
 {
     // Get the Cpu configuration
     // In case it's not available, set a match for it
-    static std::unique_ptr<sdbusplus::bus::match::match> cpuConfigMatch =
-        std::make_unique<sdbusplus::bus::match::match>(
+    static std::unique_ptr<sdbusplus::bus::match_t> cpuConfigMatch =
+        std::make_unique<sdbusplus::bus::match_t>(
             *conn,
             "type='signal',interface='org.freedesktop.DBus.Properties',member='"
             "PropertiesChanged',arg0='xyz.openbmc_project."
             "Configuration.XeonCPU'",
-            [&io, conn, &objServer](sdbusplus::message::message& msg) {
+            [&io, conn, &objServer](sdbusplus::message_t& msg) {
                 std::cerr << "get cpu configuration match\n";
                 static boost::asio::steady_timer filterTimer(io);
                 filterTimer.expires_after(
@@ -636,21 +637,21 @@ static void getCpuConfiguration(
 int main(int argc, char* argv[])
 {
     // setup connection to dbus
-    boost::asio::io_service io;
+    boost::asio::io_service& io = cpu_info::dbus::getIOContext();
     std::shared_ptr<sdbusplus::asio::connection> conn =
-        std::make_shared<sdbusplus::asio::connection>(io);
+        cpu_info::dbus::getConnection();
 
     // CPUInfo Object
     conn->request_name(cpu_info::cpuInfoObject);
     sdbusplus::asio::object_server server =
         sdbusplus::asio::object_server(conn);
-    sdbusplus::bus::bus& bus = static_cast<sdbusplus::bus::bus&>(*conn);
-    sdbusplus::server::manager::manager objManager(
-        bus, "/xyz/openbmc_project/inventory");
+    sdbusplus::bus_t& bus = static_cast<sdbusplus::bus_t&>(*conn);
+    sdbusplus::server::manager_t objManager(bus,
+                                            "/xyz/openbmc_project/inventory");
 
     cpu_info::hostStateSetup(conn);
 
-    cpu_info::sst::init(io, conn);
+    cpu_info::sst::init();
 
     // shared_ptr conn is global for the service
     // const reference of conn is passed to async calls

@@ -36,11 +36,18 @@ HostState hostState = HostState::off;
 static PowerState powerState = PowerState::Off;
 static OsState osState = OsState::Inactive;
 static bool biosDone = false;
+static std::vector<HostStateHandler> hostStateCallbacks;
 
 static std::shared_ptr<sdbusplus::asio::connection> dbusConn;
 
+void addHostStateCallback(HostStateHandler cb)
+{
+    hostStateCallbacks.push_back(cb);
+}
+
 static void updateHostState()
 {
+    HostState prevState = hostState;
     if (powerState == PowerState::Off)
     {
         hostState = HostState::off;
@@ -67,6 +74,14 @@ static void updateHostState()
         hostState = HostState::postComplete;
     }
     DEBUG_PRINT << "new host state: " << static_cast<int>(hostState) << "\n";
+
+    if (prevState != hostState)
+    {
+        for (const auto& cb : hostStateCallbacks)
+        {
+            cb(prevState, hostState);
+        }
+    }
 }
 
 void updatePowerState(const std::string& newState)
@@ -203,7 +218,7 @@ static void subscribeToProperty(
         *dbusConn,
         sdbusplus::bus::match::rules::sender(service) +
             sdbusplus::bus::match::rules::propertiesChanged(object, interface),
-        [commonPropHandler](sdbusplus::message::message& reply) {
+        [commonPropHandler](sdbusplus::message_t& reply) {
             ChangedPropertiesType changedProps;
             // ignore first param (interface name), it has to be correct
             reply.read(std::string(), changedProps);
@@ -221,7 +236,7 @@ static void subscribeToProperty(
         sdbusplus::bus::match::rules::sender(service) +
             sdbusplus::bus::match::rules::interfacesAdded(),
         [object = std::string(object), interface = std::string(interface),
-         commonPropHandler](sdbusplus::message::message& reply) {
+         commonPropHandler](sdbusplus::message_t& reply) {
             sdbusplus::message::object_path changedObject;
             reply.read(changedObject);
             if (changedObject != object)
@@ -288,4 +303,18 @@ void hostStateSetup(const std::shared_ptr<sdbusplus::asio::connection>& conn)
     initialized = true;
 }
 
+namespace dbus
+{
+boost::asio::io_context& getIOContext()
+{
+    static boost::asio::io_context ioc;
+    return ioc;
+}
+std::shared_ptr<sdbusplus::asio::connection> getConnection()
+{
+    static auto conn =
+        std::make_shared<sdbusplus::asio::connection>(getIOContext());
+    return conn;
+}
+} // namespace dbus
 } // namespace cpu_info

@@ -12,13 +12,13 @@ namespace phosphor
 namespace smbios
 {
 
-using tpmIntf = sdbusplus::server::object::object<
+using tpmIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Item::server::Tpm>;
-using assetIntf = sdbusplus::server::object::object<
+using assetIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset>;
-using itemIntf = sdbusplus::server::object::object<
+using itemIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::server::Item>;
-using softwareversionIntf = sdbusplus::server::object::object<
+using softwareversionIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Software::server::Version>;
 class Tpm : tpmIntf, assetIntf, itemIntf, softwareversionIntf
 {
@@ -30,7 +30,7 @@ class Tpm : tpmIntf, assetIntf, itemIntf, softwareversionIntf
     Tpm(Tpm&&) = default;
     Tpm& operator=(Tpm&&) = default;
 
-    Tpm(sdbusplus::bus::bus& bus, const std::string& objPath,
+    Tpm(sdbusplus::bus_t& bus, const std::string& objPath,
         uint8_t* smbiosTableStorage) :
         tpmIntf(bus, objPath.c_str()),
         assetIntf(bus, objPath.c_str()), itemIntf(bus, objPath.c_str()),
