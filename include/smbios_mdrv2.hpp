@@ -161,8 +161,13 @@ struct EntryPointStructure30
 static constexpr const char* defaultMotherboardPath =
     "/xyz/openbmc_project/inventory/system/chassis/motherboard";
 
+#ifdef NVIDIA
+static constexpr const char* cpuPath =
+    "/xyz/openbmc_project/inventory/system/chassis/motherboard/CPU_";
+#else
 static constexpr const char* cpuPath =
     "/xyz/openbmc_project/inventory/system/chassis/motherboard/cpu";
+#endif
 
 static constexpr const char* dimmPath =
     "/xyz/openbmc_project/inventory/system/chassis/motherboard/dimm";

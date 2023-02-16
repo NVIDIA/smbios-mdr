@@ -531,7 +531,10 @@ void MDR_V2::systemInfoUpdate()
                                             *moduleIntanceOpt == socket))
                 {
                     // make the cpu under socket path
-                    path = modulePath + "/cpu" + std::to_string(index);
+                    std::filesystem::path filePath(path);
+                    path.assign(modulePath)
+                        .append("/")
+                        .append(filePath.filename().string());
                     cpuContainerPath = modulePath;
                     break;
                 }
