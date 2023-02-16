@@ -58,6 +58,8 @@ static constexpr const char* systemInterfacePath =
     "/xyz/openbmc_project/inventory/system";
 static constexpr const char* systemInterface =
     "xyz.openbmc_project.Inventory.Item.System";
+static constexpr const char* chassisInterface =
+    "xyz.openbmc_project.Inventory.Item.Chassis";
 constexpr const int limitEntryLen = 0xff;
 
 class MDR_V2 :
@@ -86,7 +88,7 @@ class MDR_V2 :
             sdbusplus::bus::match::rules::interfacesAdded() +
                 sdbusplus::bus::match::rules::argNpath(
                     0, "/xyz/openbmc_project/inventory/"),
-            [&](sdbusplus::message::message& m) {
+            [&](sdbusplus::message_t& m) {
                 using Interface = std::string;
                 using Property = std::string;
                 using Value =
@@ -101,7 +103,8 @@ class MDR_V2 :
 
                 // if interface added, the inventory path could be changed
                 std::set<std::string> interestedInterfaces = {
-                    "xyz.openbmc_project.Inventory.Item.ProcessorModule"};
+                    "xyz.openbmc_project.Inventory.Item.ProcessorModule",
+                    "xyz.openbmc_project.Inventory.Item.System"};
                 for (const auto& [intf, properties] : interfaces)
                 {
                     if (interestedInterfaces.contains(intf))

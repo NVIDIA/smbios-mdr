@@ -396,23 +396,43 @@ void MDR_V2::systemInfoUpdate()
 {
     std::string motherboardPath;
     auto method = bus.new_method_call(mapperBusName, mapperPath,
-                                      mapperInterface, "GetSubTreePaths");
+                                      mapperInterface, "GetSubTree");
     method.append(systemInterfacePath);
     method.append(0);
     method.append(std::vector<std::string>({systemInterface}));
     try
     {
-        std::vector<std::string> paths;
+        std::map<std::string, std::map<std::string, std::set<std::string>>>
+            subtree;
         sdbusplus::message_t reply = bus.call(method);
-        reply.read(paths);
-        if (paths.size() < 1)
+        reply.read(subtree);
+        if (subtree.size() < 1)
         {
             phosphor::logging::log<phosphor::logging::level::ERR>(
                 "Failed to get system motherboard dbus path.");
         }
-        else
+        // If we found more than 1 system, select one with chassis intf
+        if (subtree.size() > 1)
         {
-            motherboardPath = std::move(paths[0]);
+            for (const auto& [path, services] : subtree)
+            {
+                for (const auto& [service, interfaces] : services)
+                {
+                    if (interfaces.contains(chassisInterface))
+                    {
+                        motherboardPath = path;
+                        break;
+                    }
+                }
+                if (!motherboardPath.empty())
+                {
+                    break;
+                }
+            }
+        }
+        if (motherboardPath.empty())
+        {
+            motherboardPath = subtree.begin()->first;
         }
     }
     catch (const sdbusplus::exception_t& e)
