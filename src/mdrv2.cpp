@@ -606,6 +606,95 @@ void MDR_V2::systemInfoUpdate()
         tpm = std::make_unique<Tpm>(bus, path,
                                     smbiosDir.dir[smbiosDirIndex].dataStorage);
     }
+
+    firmwareCollection.clear();
+    std::vector<std::string> existedVersionPaths;
+    auto getVersionPaths = bus.new_method_call(
+        mapperBusName, mapperPath, mapperInterface, "GetSubTreePaths");
+    getVersionPaths.append(firmwarePath);
+    getVersionPaths.append(0);
+    getVersionPaths.append(std::array<std::string, 1>({versionInterface}));
+    try
+    {
+        sdbusplus::message_t reply = bus.call(getVersionPaths);
+        reply.read(existedVersionPaths);
+    }
+    catch (const sdbusplus::exception_t& e)
+    {
+        lg2::error("Failed to query version objects. ERROR={ERROR}", "ERROR",
+                   e.what());
+        existedVersionPaths.clear();
+    }
+
+    num = getTotalNum(firmwareInventoryInformationType);
+    if (num == -1)
+    {
+        phosphor::logging::log<phosphor::logging::level::ERR>(
+            "get firmware failed");
+        return;
+    }
+
+    for (int index = 0; index < num; index++)
+    {
+        std::string path = firmwarePath;
+        auto [firmwareName, objName] = Firmware::getFirmwareName(
+            smbiosDir.dir[smbiosDirIndex].dataStorage, index);
+#ifdef FIRMWARE_COMPONENT_NAME_BMC
+        std::string bmcComponentName(FIRMWARE_COMPONENT_NAME_BMC);
+        if (bmcComponentName == firmwareName)
+        {
+            continue;
+        }
+#endif
+#ifdef FIRMWARE_COMPONENT_NAME_BIOS
+        std::string biosComponentName(FIRMWARE_COMPONENT_NAME_BIOS);
+        if (biosComponentName == firmwareName && system != nullptr)
+        {
+            continue;
+        }
+#endif
+#ifdef FIRMWARE_COMPONENT_NAME_TPM
+        std::string tpmComponentName(FIRMWARE_COMPONENT_NAME_TPM);
+        if (tpmComponentName == firmwareName && tpm != nullptr)
+        {
+            continue;
+        }
+#endif
+
+        if (objName.empty())
+        {
+            objName = "firmware" + std::to_string(index);
+        }
+        objName =
+            std::regex_replace(objName, std::regex("[^a-zA-Z0-9_/]+"), "_");
+
+        // Skip if we have the same object name on DBUS, BIOS probably fetchs it
+        // from BMC.
+        auto eqObjName = [objName](std::string s) {
+            std::filesystem::path p(s);
+            return p.filename().compare(objName) == 0;
+        };
+        if (std::find_if(existedVersionPaths.begin(), existedVersionPaths.end(),
+                         std::move(eqObjName)) != existedVersionPaths.end())
+        {
+            continue;
+        }
+
+        path.append("/").append(objName);
+        try
+        {
+            firmwareCollection.emplace_back(
+                std::make_unique<phosphor::smbios::Firmware>(
+                    bus, path, index,
+                    smbiosDir.dir[smbiosDirIndex].dataStorage));
+        }
+        catch (const sdbusplus::exception_t& e)
+        {
+            phosphor::logging::log<phosphor::logging::level::ERR>(
+                "Failed to create firmware object",
+                phosphor::logging::entry("ERROR=%s", e.what()));
+        }
+    }
 }
 
 int MDR_V2::getTotalCpuSlot()

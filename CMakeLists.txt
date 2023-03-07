@@ -40,7 +40,7 @@ add_definitions (-DBOOST_NO_TYPEID)
 add_definitions (-DBOOST_ASIO_DISABLE_THREADS)
 
 set (SRC_FILES src/mdrv2.cpp src/mdrv2_main.cpp src/cpu.cpp src/dimm.cpp
-     src/system.cpp src/pcieslot.cpp src/tpm.cpp)
+     src/system.cpp src/pcieslot.cpp src/tpm.cpp src/firmware.cpp)
 
 include_directories (${CMAKE_CURRENT_BINARY_DIR})
 
@@ -67,6 +67,20 @@ if (DIMM_ONLY_LOCATOR)
     target_compile_definitions (smbiosmdrv2app PRIVATE DIMM_ONLY_LOCATOR)
 endif ()
 
+set(FIRMWARE_COMPONENT_NAME_BMC "" CACHE STRING "BMC firmware component name in Type 45, it is used to avoid duplicated version object")
+if(NOT FIRMWARE_COMPONENT_NAME_BMC STREQUAL "")
+  add_compile_definitions(FIRMWARE_COMPONENT_NAME_BMC="${FIRMWARE_COMPONENT_NAME_BMC}")
+endif()
+
+set(FIRMWARE_COMPONENT_NAME_BIOS "" CACHE STRING "BIOS firmware component name in Type 45, it is used to avoid duplicated version object")
+if(NOT FIRMWARE_COMPONENT_NAME_BIOS STREQUAL "")
+  add_compile_definitions(FIRMWARE_COMPONENT_NAME_BIOS="${FIRMWARE_COMPONENT_NAME_BIOS}")
+endif()
+
+set(FIRMWARE_COMPONENT_NAME_TPM "" CACHE STRING "TPM firmware component name in Type 45, it is used to avoid duplicated version object")
+if(NOT FIRMWARE_COMPONENT_NAME_TPM STREQUAL "")
+  add_compile_definitions(FIRMWARE_COMPONENT_NAME_TPM="${FIRMWARE_COMPONENT_NAME_TPM}")
+endif()
 
 option (CPU_INFO "Add Cpuinfo Service" ON)
 

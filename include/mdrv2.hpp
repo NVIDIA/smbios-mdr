@@ -17,6 +17,7 @@
 #pragma once
 #include "cpu.hpp"
 #include "dimm.hpp"
+#include "firmware.hpp"
 #include "pcieslot.hpp"
 #include "smbios_mdrv2.hpp"
 #include "system.hpp"
@@ -60,6 +61,8 @@ static constexpr const char* systemInterface =
     "xyz.openbmc_project.Inventory.Item.System";
 static constexpr const char* chassisInterface =
     "xyz.openbmc_project.Inventory.Item.Chassis";
+static constexpr const char* versionInterface =
+    "xyz.openbmc_project.Software.Version";
 constexpr const int limitEntryLen = 0xff;
 
 class MDR_V2 :
@@ -189,6 +192,7 @@ class MDR_V2 :
     std::vector<std::unique_ptr<Pcie>> pcies;
     std::unique_ptr<System> system;
     std::unique_ptr<Tpm> tpm;
+    std::vector<std::unique_ptr<Firmware>> firmwareCollection;
     std::shared_ptr<sdbusplus::asio::dbus_interface> smbiosInterface;
     std::unique_ptr<sdbusplus::bus::match_t> interfaceAddedMatch;
 };
