@@ -400,6 +400,7 @@ void MDR_V2::systemInfoUpdate()
     method.append(systemInterfacePath);
     method.append(0);
     method.append(std::vector<std::string>({systemInterface}));
+
     try
     {
         std::map<std::string, std::map<std::string, std::set<std::string>>>
@@ -409,7 +410,32 @@ void MDR_V2::systemInfoUpdate()
         if (subtree.size() < 1)
         {
             phosphor::logging::log<phosphor::logging::level::ERR>(
-                "Failed to get system motherboard dbus path.");
+                "Failed to get system motherboard dbus path. Setting up a "
+                "match rule");
+            // Add match rule if motherboard dbus path is not yet created
+            static std::unique_ptr<sdbusplus::bus::match_t>
+                motherboardConfigMatch =
+                    std::make_unique<sdbusplus::bus::match_t>(
+                        bus,
+                        sdbusplus::bus::match::rules::interfacesAdded() +
+                            sdbusplus::bus::match::rules::argNpath(
+                                0,
+                                "/xyz/openbmc_project/inventory/system/board/"),
+                        [this,
+                         systemInterface](sdbusplus::message::message& msg) {
+                            sdbusplus::message::object_path objectName;
+                            boost::container::flat_map<
+                                std::string,
+                                boost::container::flat_map<
+                                    std::string,
+                                    std::variant<std::string, uint64_t>>>
+                                msgData;
+                            msg.read(objectName, msgData);
+                            if (msgData.contains(systemInterface))
+                            {
+                                this->systemInfoUpdate();
+                            }
+                        });
         }
         // If we found more than 1 system, select one with chassis intf
         if (subtree.size() > 1)
