@@ -82,6 +82,11 @@ if(NOT FIRMWARE_COMPONENT_NAME_TPM STREQUAL "")
   add_compile_definitions(FIRMWARE_COMPONENT_NAME_TPM="${FIRMWARE_COMPONENT_NAME_TPM}")
 endif()
 
+set(PLATFORM_PREFIX "" CACHE STRING "Platform prefix, it prepend to DBus object name, such as ${PLATFORM_PREFIX}_CPU_0")
+if(NOT PLATFORM_PREFIX STREQUAL "")
+  add_compile_definitions(PLATFORM_PREFIX="${PLATFORM_PREFIX}")
+endif()
+
 option (CPU_INFO "Add Cpuinfo Service" ON)
 
 option (YOCTO "Enable Building in Yocto" OFF)

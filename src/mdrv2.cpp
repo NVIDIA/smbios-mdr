@@ -542,6 +542,7 @@ void MDR_V2::systemInfoUpdate()
             }
         }
 
+        path = decorateName(path);
         cpus.emplace_back(std::make_unique<phosphor::smbios::Cpu>(
             bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
             cpuContainerPath));

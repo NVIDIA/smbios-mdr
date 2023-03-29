@@ -19,6 +19,7 @@
 #include <phosphor-logging/elog-errors.hpp>
 
 #include <array>
+#include <filesystem>
 
 static constexpr const char* mdrType2File = "/var/lib/smbios/smbios2";
 static constexpr const char* smbiosPath = "/var/lib/smbios";
@@ -188,6 +189,26 @@ static constexpr const char* tpmPath =
     "/xyz/openbmc_project/inventory/system/chassis/motherboard/tpm";
 
 static constexpr const char* firmwarePath = "/xyz/openbmc_project/software";
+
+/**
+ * @brief This function takes a string argument representing a file path and, if
+ * the PLATFORM_PREFIX macro is defined, modifies the filename by adding a
+ * platform-specific prefix to it. If the macro is not defined, the function
+ * returns the input path unmodified.
+ * @param path The input file path to decorate.
+ * @return A string representing the decorated file path.
+ */
+inline std::string decorateName(const std::string& path)
+{
+#ifdef PLATFORM_PREFIX
+    std::filesystem::path filepath(path);
+    filepath.replace_filename(std::string(PLATFORM_PREFIX) + "_" +
+                              filepath.filename().string());
+    return filepath;
+#else
+    return path;
+#endif
+}
 
 constexpr std::array<SMBIOSVersion, 5> supportedSMBIOSVersions{
     SMBIOSVersion{3, 0}, SMBIOSVersion{3, 2}, SMBIOSVersion{3, 3},
