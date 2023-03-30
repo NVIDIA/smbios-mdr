@@ -85,7 +85,6 @@ class MDR_V2 :
                                  smbiosPath, smbiosInterfaceName))
     {
 
-#ifdef NVIDIA
         interfaceAddedMatch = std::make_unique<sdbusplus::bus::match_t>(
             bus,
             sdbusplus::bus::match::rules::interfacesAdded() +
@@ -116,7 +115,6 @@ class MDR_V2 :
                     }
                 }
             });
-#endif
 
         smbiosDir.agentVersion = smbiosAgentVersion;
         smbiosDir.dirVersion = 1;
