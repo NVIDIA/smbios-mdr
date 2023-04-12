@@ -506,8 +506,32 @@ void MDR_V2::systemInfoUpdate()
         }
     }
 
+    int num;
+
+    int processorModuleIndex = 0;
+    baseboards.clear();
+    num = getTotalNum(baseboardType);
+    for (int index = 0; index < num; index++)
+    {
+        using enum phosphor::smbios::Baseboard::BoardType;
+        baseboards.emplace_back(std::make_unique<phosphor::smbios::Baseboard>(
+            index, smbiosDir.dir[smbiosDirIndex].dataStorage));
+        auto& baseboard = baseboards.back();
+        switch (baseboard->getType())
+        {
+            case ProcessorModule:
+            case ProcesssorMemoryModule:
+            case ProcessorIoModule:
+                baseboard->setName("ProcessorModule_" +
+                                   std::to_string(processorModuleIndex++));
+                break;
+            default:
+                break;
+        }
+    }
+
     cpus.clear();
-    int num = getTotalCpuSlot();
+    num = getTotalCpuSlot();
     if (num == -1)
     {
         phosphor::logging::log<phosphor::logging::level::ERR>(
@@ -562,7 +586,27 @@ void MDR_V2::systemInfoUpdate()
 
     for (int index = 0; index < num; index++)
     {
-        std::string path = dimmPath + std::to_string(index);
+        std::string objName = "Memory_" + std::to_string(index);
+
+        // Rename the object if it's contaned by a board
+        uint8_t* dataIn = smbiosDir.dir[smbiosDirIndex].dataStorage;
+        dataIn = getSMBIOSTypeIndexPtr(dataIn, memoryDeviceType, index);
+        auto memoryHeader = reinterpret_cast<struct StructureHeader*>(dataIn);
+        for (const auto& baseboard : baseboards)
+        {
+            auto [found, indexOfType] =
+                baseboard->findIndexOfType(memoryHeader->handle);
+            if (found == true)
+            {
+                objName = baseboard->getName() + "_" + "Memory_" +
+                          std::to_string(indexOfType);
+                break;
+            }
+        }
+
+        std::string path(defaultMotherboardPath);
+        path += "/" + objName;
+        path = decorateName(path);
         dimms.emplace_back(std::make_unique<phosphor::smbios::Dimm>(
             bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
             motherboardPath));

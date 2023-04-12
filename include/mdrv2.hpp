@@ -15,6 +15,7 @@
 */
 
 #pragma once
+#include "baseboard.hpp"
 #include "cpu.hpp"
 #include "dimm.hpp"
 #include "firmware.hpp"
@@ -191,6 +192,7 @@ class MDR_V2 :
     std::unique_ptr<System> system;
     std::unique_ptr<Tpm> tpm;
     std::vector<std::unique_ptr<Firmware>> firmwareCollection;
+    std::vector<std::unique_ptr<Baseboard>> baseboards;
     std::shared_ptr<sdbusplus::asio::dbus_interface> smbiosInterface;
     std::unique_ptr<sdbusplus::bus::match_t> interfaceAddedMatch;
 };
