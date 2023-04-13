@@ -65,6 +65,7 @@ void Dimm::memoryInfoUpdate(void)
 
     auto memoryInfo = reinterpret_cast<struct MemoryInfo*>(dataIn);
 
+    memoryTotalWidth(memoryInfo->totalWidth);
     memoryDataWidth(memoryInfo->dataWidth);
 
     if (memoryInfo->size == maxOldDimmSize)
@@ -144,6 +145,12 @@ EccType Dimm::ecc(EccType value)
 {
     return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::ecc(
         value);
+}
+
+uint16_t Dimm::memoryTotalWidth(uint16_t value)
+{
+    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
+        memoryTotalWidth(value);
 }
 
 uint16_t Dimm::memoryDataWidth(uint16_t value)
