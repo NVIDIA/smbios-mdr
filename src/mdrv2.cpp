@@ -412,6 +412,7 @@ void MDR_V2::systemInfoUpdate()
             phosphor::logging::log<phosphor::logging::level::ERR>(
                 "Failed to get system motherboard dbus path.");
         }
+
         // If we found more than 1 system, select one with chassis intf
         if (subtree.size() > 1)
         {
@@ -431,8 +432,10 @@ void MDR_V2::systemInfoUpdate()
                 }
             }
         }
-        if (motherboardPath.empty())
+
+        if (motherboardPath.empty() && subtree.size() != 0)
         {
+
             motherboardPath = subtree.begin()->first;
         }
     }
