@@ -33,10 +33,10 @@ bool onlyDimmLocationCode = false;
 #endif
 
 using DeviceType =
-    sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::DeviceType;
+    sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::DeviceType;
 
 using EccType =
-    sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::Ecc;
+    sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::Ecc;
 
 static constexpr uint16_t maxOldDimmSize = 0x7fff;
 void Dimm::memoryInfoUpdate(void)
@@ -143,7 +143,7 @@ void Dimm::updateEccType(uint16_t exPhyArrayHandle)
 
 EccType Dimm::ecc(EccType value)
 {
-    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::ecc(
+    return sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::ecc(
         value);
 }
 
@@ -155,7 +155,7 @@ uint16_t Dimm::memoryTotalWidth(uint16_t value)
 
 uint16_t Dimm::memoryDataWidth(uint16_t value)
 {
-    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
+    return sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::
         memoryDataWidth(value);
 }
 
@@ -179,7 +179,7 @@ void Dimm::dimmSizeExt(uint32_t size)
 
 size_t Dimm::memorySizeInKB(size_t value)
 {
-    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
+    return sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::
         memorySizeInKB(value);
 }
 
@@ -209,7 +209,7 @@ void Dimm::dimmDeviceLocator(const uint8_t bankLocatorPositionNum,
 
 std::string Dimm::memoryDeviceLocator(std::string value)
 {
-    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
+    return sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::
         memoryDeviceLocator(value);
 }
 
@@ -228,7 +228,7 @@ void Dimm::dimmType(const uint8_t type)
 
 DeviceType Dimm::memoryType(DeviceType value)
 {
-    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
+    return sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::
         memoryType(value);
 }
 
@@ -248,13 +248,13 @@ void Dimm::dimmTypeDetail(uint16_t detail)
 
 std::string Dimm::memoryTypeDetail(std::string value)
 {
-    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
+    return sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::
         memoryTypeDetail(value);
 }
 
 uint16_t Dimm::maxMemorySpeedInMhz(uint16_t value)
 {
-    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
+    return sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::
         maxMemorySpeedInMhz(value);
 }
 
@@ -275,13 +275,13 @@ void Dimm::dimmManufacturer(const uint8_t positionNum, const uint8_t structLen,
 
 std::string Dimm::manufacturer(std::string value)
 {
-    return sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
+    return sdbusplus::server::xyz::openbmc_project::inventory::decorator::
         Asset::manufacturer(value);
 }
 
 bool Dimm::present(bool value)
 {
-    return sdbusplus::xyz::openbmc_project::Inventory::server::Item::present(
+    return sdbusplus::server::xyz::openbmc_project::inventory::Item::present(
         value);
 }
 
@@ -295,7 +295,7 @@ void Dimm::dimmSerialNum(const uint8_t positionNum, const uint8_t structLen,
 
 std::string Dimm::serialNumber(std::string value)
 {
-    return sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
+    return sdbusplus::server::xyz::openbmc_project::inventory::decorator::
         Asset::serialNumber(value);
 }
 
@@ -312,31 +312,31 @@ void Dimm::dimmPartNum(const uint8_t positionNum, const uint8_t structLen,
 
 std::string Dimm::partNumber(std::string value)
 {
-    return sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
+    return sdbusplus::server::xyz::openbmc_project::inventory::decorator::
         Asset::partNumber(value);
 }
 
 std::string Dimm::locationCode(std::string value)
 {
-    return sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
+    return sdbusplus::server::xyz::openbmc_project::inventory::decorator::
         LocationCode::locationCode(value);
 }
 
 uint8_t Dimm::memoryAttributes(uint8_t value)
 {
-    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
+    return sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::
         memoryAttributes(value);
 }
 
 uint16_t Dimm::memoryConfiguredSpeedInMhz(uint16_t value)
 {
-    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
+    return sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::
         memoryConfiguredSpeedInMhz(value);
 }
 
 bool Dimm::functional(bool value)
 {
-    return sdbusplus::xyz::openbmc_project::State::Decorator::server::
+    return sdbusplus::server::xyz::openbmc_project::state::decorator::
         OperationalStatus::functional(value);
 }
 

@@ -31,7 +31,7 @@ namespace phosphor
 namespace smbios
 {
 
-std::vector<uint8_t> MDR_V2::getDirectoryInformation(uint8_t dirIndex)
+std::vector<uint8_t> MDRV2::getDirectoryInformation(uint8_t dirIndex)
 {
     std::vector<uint8_t> responseDir;
 
@@ -74,7 +74,7 @@ std::vector<uint8_t> MDR_V2::getDirectoryInformation(uint8_t dirIndex)
     return responseDir;
 }
 
-bool MDR_V2::smbiosIsAvailForUpdate(uint8_t index)
+bool MDRV2::smbiosIsAvailForUpdate(uint8_t index)
 {
     bool ret = false;
     if (index >= maxDirEntries)
@@ -116,7 +116,7 @@ bool MDR_V2::smbiosIsAvailForUpdate(uint8_t index)
     return ret;
 }
 
-std::vector<uint8_t> MDR_V2::getDataOffer()
+std::vector<uint8_t> MDRV2::getDataOffer()
 {
     std::vector<uint8_t> offer(sizeof(DataIdStruct));
     if (smbiosIsAvailForUpdate(0))
@@ -134,7 +134,7 @@ std::vector<uint8_t> MDR_V2::getDataOffer()
     return offer;
 }
 
-inline uint8_t MDR_V2::smbiosValidFlag(uint8_t index)
+inline uint8_t MDRV2::smbiosValidFlag(uint8_t index)
 {
     FlagStatus ret = FlagStatus::flagIsInvalid;
     MDR2SMBIOSStatusEnum stage = smbiosDir.dir[index].stage;
@@ -177,7 +177,7 @@ void appendReversed(std::vector<uint8_t>& vector, const T& value)
     std::reverse_copy(data, data + sizeof(value), std::back_inserter(vector));
 }
 
-std::vector<uint8_t> MDR_V2::getDataInformation(uint8_t idIndex)
+std::vector<uint8_t> MDRV2::getDataInformation(uint8_t idIndex)
 {
     std::vector<uint8_t> responseInfo;
     responseInfo.push_back(mdr2Version);
@@ -202,7 +202,7 @@ std::vector<uint8_t> MDR_V2::getDataInformation(uint8_t idIndex)
     return responseInfo;
 }
 
-bool MDR_V2::readDataFromFlash(MDRSMBIOSHeader* mdrHdr, uint8_t* data)
+bool MDRV2::readDataFromFlash(MDRSMBIOSHeader* mdrHdr, uint8_t* data)
 {
     if (mdrHdr == nullptr)
     {
@@ -254,10 +254,10 @@ bool MDR_V2::readDataFromFlash(MDRSMBIOSHeader* mdrHdr, uint8_t* data)
     return true;
 }
 
-bool MDR_V2::sendDirectoryInformation(uint8_t dirVersion, uint8_t dirIndex,
-                                      uint8_t returnedEntries,
-                                      uint8_t remainingEntries,
-                                      std::vector<uint8_t> dirEntry)
+bool MDRV2::sendDirectoryInformation(uint8_t dirVersion, uint8_t dirIndex,
+                                     uint8_t returnedEntries,
+                                     uint8_t remainingEntries,
+                                     std::vector<uint8_t> dirEntry)
 {
     bool teminate = false;
     if ((dirIndex >= maxDirEntries) || (returnedEntries < 1))
@@ -309,9 +309,8 @@ bool MDR_V2::sendDirectoryInformation(uint8_t dirVersion, uint8_t dirIndex,
     return teminate;
 }
 
-bool MDR_V2::sendDataInformation(uint8_t idIndex, uint8_t flag,
-                                 uint32_t dataLen, uint32_t dataVer,
-                                 uint32_t timeStamp)
+bool MDRV2::sendDataInformation(uint8_t idIndex, uint8_t flag, uint32_t dataLen,
+                                uint32_t dataVer, uint32_t timeStamp)
 {
     if (idIndex >= maxDirEntries)
     {
@@ -343,7 +342,7 @@ bool MDR_V2::sendDataInformation(uint8_t idIndex, uint8_t flag,
     return true;
 }
 
-int MDR_V2::findIdIndex(std::vector<uint8_t> dataInfo)
+int MDRV2::findIdIndex(std::vector<uint8_t> dataInfo)
 {
     if (dataInfo.size() != sizeof(DataIdStruct))
     {
@@ -375,7 +374,7 @@ int MDR_V2::findIdIndex(std::vector<uint8_t> dataInfo)
     throw sdbusplus::xyz::openbmc_project::Smbios::MDR_V2::Error::InvalidId();
 }
 
-uint8_t MDR_V2::directoryEntries(uint8_t value)
+uint8_t MDRV2::directoryEntries(uint8_t value)
 {
     std::ifstream smbiosFile(mdrType2File, std::ios_base::binary);
     if (!smbiosFile.good())
@@ -388,11 +387,11 @@ uint8_t MDR_V2::directoryEntries(uint8_t value)
     {
         value = smbiosDir.dirEntries;
     }
-    return sdbusplus::xyz::openbmc_project::Smbios::server::MDR_V2::
+    return sdbusplus::server::xyz::openbmc_project::smbios::MDRV2::
         directoryEntries(value);
 }
 
-void MDR_V2::systemInfoUpdate()
+void MDRV2::systemInfoUpdate()
 {
     std::string motherboardPath;
     auto method = bus.new_method_call(mapperBusName, mapperPath,
@@ -743,7 +742,7 @@ void MDR_V2::systemInfoUpdate()
     }
 }
 
-int MDR_V2::getTotalCpuSlot()
+int MDRV2::getTotalCpuSlot()
 {
     uint8_t* dataIn = smbiosDir.dir[smbiosDirIndex].dataStorage;
     int num = 0;
@@ -777,7 +776,7 @@ int MDR_V2::getTotalCpuSlot()
     return num;
 }
 
-int MDR_V2::getTotalDimmSlot()
+int MDRV2::getTotalDimmSlot()
 {
     uint8_t* dataIn = smbiosDir.dir[smbiosDirIndex].dataStorage;
     uint8_t num = 0;
@@ -811,7 +810,7 @@ int MDR_V2::getTotalDimmSlot()
     return num;
 }
 
-int MDR_V2::getTotalPcieSlot()
+int MDRV2::getTotalPcieSlot()
 {
     uint8_t* dataIn = smbiosDir.dir[smbiosDirIndex].dataStorage;
     int num = 0;
@@ -852,6 +851,7 @@ int MDR_V2::getTotalPcieSlot()
     return num;
 }
 
+<<<<<<< HEAD
 int MDR_V2::getTotalNum(uint8_t typeId, size_t minSize)
 {
     uint8_t* dataIn = smbiosDir.dir[smbiosDirIndex].dataStorage;
@@ -887,6 +887,11 @@ int MDR_V2::getTotalNum(uint8_t typeId, size_t minSize)
 }
 
 bool MDR_V2::checkSMBIOSVersion(uint8_t* dataIn)
+||||||| 5961693
+bool MDR_V2::checkSMBIOSVersion(uint8_t* dataIn)
+=======
+bool MDRV2::checkSMBIOSVersion(uint8_t* dataIn)
+>>>>>>> origin/master
 {
     std::string buffer(dataIn, dataIn + smbiosTableStorageSize);
 
@@ -956,7 +961,7 @@ bool MDR_V2::checkSMBIOSVersion(uint8_t* dataIn)
     return true;
 }
 
-bool MDR_V2::agentSynchronizeData()
+bool MDRV2::agentSynchronizeData()
 {
     struct MDRSMBIOSHeader mdr2SMBIOS;
     bool status = readDataFromFlash(&mdr2SMBIOS,
@@ -985,8 +990,8 @@ bool MDR_V2::agentSynchronizeData()
     return true;
 }
 
-std::vector<uint32_t> MDR_V2::synchronizeDirectoryCommonData(uint8_t idIndex,
-                                                             uint32_t size)
+std::vector<uint32_t> MDRV2::synchronizeDirectoryCommonData(uint8_t idIndex,
+                                                            uint32_t size)
 {
     std::chrono::microseconds usec(
         defaultTimeout); // default lock time out is 2s
@@ -1010,7 +1015,7 @@ std::vector<uint32_t> MDR_V2::synchronizeDirectoryCommonData(uint8_t idIndex,
 }
 
 std::vector<boost::container::flat_map<std::string, RecordVariant>>
-    MDR_V2::getRecordType(size_t type)
+    MDRV2::getRecordType(size_t type)
 {
 
     std::vector<boost::container::flat_map<std::string, RecordVariant>> ret;

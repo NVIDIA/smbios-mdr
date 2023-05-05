@@ -28,6 +28,7 @@ namespace phosphor
 namespace smbios
 {
 
+<<<<<<< HEAD
 using uuidIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Common::server::UUID>;
 using revisionIntf = sdbusplus::server::object_t<
@@ -37,6 +38,19 @@ using associationIntf = sdbusplus::server::object_t<
 using softwareversionIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Software::server::Version>;
 class System : uuidIntf, revisionIntf, associationIntf, softwareversionIntf
+||||||| 5961693
+class System :
+    sdbusplus::server::object_t<
+        sdbusplus::xyz::openbmc_project::Common::server::UUID>,
+    sdbusplus::server::object_t<
+        sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Revision>
+=======
+class System :
+    sdbusplus::server::object_t<
+        sdbusplus::server::xyz::openbmc_project::common::UUID>,
+    sdbusplus::server::object_t<
+        sdbusplus::server::xyz::openbmc_project::inventory::decorator::Revision>
+>>>>>>> origin/master
 {
   public:
     System() = delete;
@@ -48,11 +62,31 @@ class System : uuidIntf, revisionIntf, associationIntf, softwareversionIntf
 
     System(sdbusplus::bus_t& bus, const std::string& objPath,
            uint8_t* smbiosTableStorage) :
+<<<<<<< HEAD
         uuidIntf(bus, objPath.c_str()),
         revisionIntf(bus, objPath.c_str()),
         associationIntf(bus, objPath.c_str()),
         softwareversionIntf(bus, objPath.c_str()), bus(bus), path(objPath),
         storage(smbiosTableStorage)
+||||||| 5961693
+        sdbusplus::server::object_t<
+            sdbusplus::xyz::openbmc_project::Common::server::UUID>(
+            bus, objPath.c_str()),
+        bus(bus),
+        sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
+                                        Decorator::server::Revision>(
+            bus, objPath.c_str()),
+        path(objPath), storage(smbiosTableStorage)
+=======
+        sdbusplus::server::object_t<
+            sdbusplus::server::xyz::openbmc_project::common::UUID>(
+            bus, objPath.c_str()),
+        bus(bus),
+        sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
+                                        inventory::decorator::Revision>(
+            bus, objPath.c_str()),
+        path(objPath), storage(smbiosTableStorage)
+>>>>>>> origin/master
     {
         std::string input = "0";
         uuid(input);
