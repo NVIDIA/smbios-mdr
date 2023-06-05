@@ -140,7 +140,8 @@ class Cpu :
         sdbusplus::server::object_t<processor, asset, assetTagType, location,
                                     connector, rev, Item, association, instance,
                                     chassis>(bus, objPath.c_str()),
-        cpuNum(cpuId), storage(smbiosTableStorage), motherboardPath(motherboard)
+        cpuNum(cpuId), storage(smbiosTableStorage),
+        motherboardPath(motherboard), objPath(objPath)
     {
         infoUpdate();
     }
@@ -196,6 +197,8 @@ class Cpu :
     uint8_t* storage;
 
     std::string motherboardPath;
+
+    std::string objPath;
 
     struct ProcessorInfo
     {

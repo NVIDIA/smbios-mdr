@@ -254,7 +254,8 @@ void Cpu::infoUpdate(void)
     if (!motherboardPath.empty())
     {
         std::vector<std::tuple<std::string, std::string, std::string>> assocs;
-        assocs.emplace_back("chassis", "processors", motherboardPath);
+        assocs.emplace_back("processors", "all_processors", objPath);
+        assocs.emplace_back("parent_chassis", "all_chassis", motherboardPath);
         association::associations(assocs);
     }
 }
