@@ -732,6 +732,12 @@ void MDR_V2::systemInfoUpdate()
         path.append("/").append(objName);
         try
         {
+            std::string cp = path;
+            std::transform(cp.begin(), cp.end(), cp.begin(), ::tolower);
+
+            if (cp.find("psu") != std::string::npos)
+                continue;
+
             firmwareCollection.emplace_back(
                 std::make_unique<phosphor::smbios::Firmware>(
                     bus, path, index,
