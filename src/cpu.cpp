@@ -173,6 +173,7 @@ void Cpu::infoUpdate(void)
         return;
     }
     present(true);
+    chassis::type(chassis::ChassisType::Component);
 
     // this class is for type CPU  //offset 5h
     family(cpuInfo->family, cpuInfo->family2); // offset 6h and 28h
