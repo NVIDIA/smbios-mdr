@@ -950,7 +950,19 @@ bool MDRV2::agentSynchronizeData()
         directoryEntries(smbiosDir.dirEntries);
     }
 
-    systemInfoUpdate();
+    // Defer systemInfoUpdate() so AgentSynchronizeData returns quickly and the
+    // IPMI blob commit ACKs within the host SSIF read window (nvbug 4165354).
+    // Re-land of bef2c6f, dropped by the 25.09 upstream-sync merge ae27d59.
+    std::chrono::microseconds usec(defaultTimeout);
+    timer.expires_after(usec);
+    timer.async_wait([this](boost::system::error_code ec) {
+        if (ec)
+        {
+            lg2::error("Timer Error!");
+            return;
+        }
+        systemInfoUpdate();
+    });
     smbiosDir.dir[smbiosDirIndex].common.dataVersion = mdr2SMBIOS.dirVer;
     smbiosDir.dir[smbiosDirIndex].common.timestamp = mdr2SMBIOS.timestamp;
     smbiosDir.dir[smbiosDirIndex].common.size = mdr2SMBIOS.dataSize;
