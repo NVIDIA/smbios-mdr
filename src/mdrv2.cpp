@@ -984,7 +984,20 @@ bool MDR_V2::agentSynchronizeData()
         return false;
     }
 
-    systemInfoUpdate();
+    // Defer systemInfoUpdate() to speed up reply
+    std::chrono::microseconds usec(
+        defaultTimeout);
+    timer.expires_after(usec);
+    timer.async_wait([this](boost::system::error_code ec) {
+        if (ec || this == nullptr)
+        {
+            phosphor::logging::log<phosphor::logging::level::ERR>(
+                "Timer Error!");
+            return;
+        }
+        systemInfoUpdate();
+    });
+
     smbiosDir.dir[smbiosDirIndex].common.dataVersion = mdr2SMBIOS.dirVer;
     smbiosDir.dir[smbiosDirIndex].common.timestamp = mdr2SMBIOS.timestamp;
     smbiosDir.dir[smbiosDirIndex].common.size = mdr2SMBIOS.dataSize;
