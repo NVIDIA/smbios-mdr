@@ -18,9 +18,13 @@ using assetIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset>;
 using itemIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::server::Item>;
+#ifdef EXPOSE_FW_INVENTORY
 using softwareversionIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Software::server::Version>;
 class Firmware : associationIntf, assetIntf, itemIntf, softwareversionIntf
+#else
+class Firmware : associationIntf, assetIntf, itemIntf
+#endif
 {
   public:
     Firmware() = delete;
@@ -34,7 +38,10 @@ class Firmware : associationIntf, assetIntf, itemIntf, softwareversionIntf
              uint8_t* smbiosTableStorage) :
         associationIntf(bus, objPath.c_str()),
         assetIntf(bus, objPath.c_str()), itemIntf(bus, objPath.c_str()),
-        softwareversionIntf(bus, objPath.c_str()), path(objPath),
+#ifdef EXPOSE_FW_INVENTORY
+        softwareversionIntf(bus, objPath.c_str()),
+#endif
+        path(objPath),
         storage(smbiosTableStorage), index(index)
     {
         firmwareInfoUpdate();
@@ -75,10 +82,12 @@ class Firmware : associationIntf, assetIntf, itemIntf, softwareversionIntf
 
     void firmwareComponentName(const uint8_t positionNum,
                                const uint8_t structLen, uint8_t* dataIn);
+#ifdef EXPOSE_FW_INVENTORY
     void firmwareVersion(const uint8_t positionNum, const uint8_t structLen,
                          uint8_t* dataIn);
     void firmwareId(const uint8_t positionNum, const uint8_t structLen,
                     uint8_t* dataIn);
+#endif
     void firmwareReleaseDate(const uint8_t positionNum, const uint8_t structLen,
                              uint8_t* dataIn);
     void firmwareManufacturer(const uint8_t positionNum,

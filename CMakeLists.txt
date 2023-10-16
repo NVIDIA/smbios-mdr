@@ -39,6 +39,11 @@ add_definitions (-DBOOST_NO_RTTI)
 add_definitions (-DBOOST_NO_TYPEID)
 add_definitions (-DBOOST_ASIO_DISABLE_THREADS)
 
+option (EXPOSE_INVENTORY "Process Type 45 and report fw version" ON)
+if (EXPOSE_INVENTORY)
+    add_definitions (-DEXPOSE_FW_INVENTORY)
+endif ()
+
 set (SRC_FILES src/mdrv2.cpp src/mdrv2_main.cpp src/cpu.cpp src/dimm.cpp
      src/system.cpp src/pcieslot.cpp src/tpm.cpp src/firmware.cpp)
 
