@@ -533,48 +533,6 @@ void MDR_V2::systemInfoUpdate()
         }
     }
 
-    cpus.clear();
-    num = getTotalCpuSlot();
-    if (num == -1)
-    {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "get cpu total slot failed");
-        return;
-    }
-
-    for (int index = 0; index < num; index++)
-    {
-        std::string path = cpuPath + std::to_string(index);
-        std::string cpuContainerPath = motherboardPath;
-
-        // customize path if we know the socket number
-        auto dataPtr = getSMBIOSTypeIndexPtr(
-            smbiosDir.dir[smbiosDirIndex].dataStorage, processorsType, index);
-        auto [found, socket, chip] = Cpu::socketChipNumber(dataPtr);
-        if (found && modules.size())
-        {
-            for (auto& [modulePath, moduleIntanceOpt] : modules)
-            {
-                if (modules.size() == 1 || (moduleIntanceOpt.has_value() &&
-                                            *moduleIntanceOpt == socket))
-                {
-                    // make the cpu under socket path
-                    std::filesystem::path filePath(path);
-                    path.assign(modulePath)
-                        .append("/")
-                        .append(filePath.filename().string());
-                    cpuContainerPath = modulePath;
-                    break;
-                }
-            }
-        }
-
-        path = decorateName(path);
-        cpus.emplace_back(std::make_unique<phosphor::smbios::Cpu>(
-            bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
-            cpuContainerPath));
-    }
-
 #ifdef DIMM_DBUS
 
     dimms.clear();
@@ -642,6 +600,48 @@ void MDR_V2::systemInfoUpdate()
     system.reset();
     system = std::make_unique<System>(
         bus, systemPath, smbiosDir.dir[smbiosDirIndex].dataStorage);
+
+    cpus.clear();
+    num = getTotalCpuSlot();
+    if (num == -1)
+    {
+        phosphor::logging::log<phosphor::logging::level::ERR>(
+            "get cpu total slot failed");
+        return;
+    }
+
+    for (int index = 0; index < num; index++)
+    {
+        std::string path = cpuPath + std::to_string(index);
+        std::string cpuContainerPath = motherboardPath;
+
+        // customize path if we know the socket number
+        auto dataPtr = getSMBIOSTypeIndexPtr(
+            smbiosDir.dir[smbiosDirIndex].dataStorage, processorsType, index);
+        auto [found, socket, chip] = Cpu::socketChipNumber(dataPtr);
+        if (found && modules.size())
+        {
+            for (auto& [modulePath, moduleIntanceOpt] : modules)
+            {
+                if (modules.size() == 1 || (moduleIntanceOpt.has_value() &&
+                                            *moduleIntanceOpt == socket))
+                {
+                    // make the cpu under socket path
+                    std::filesystem::path filePath(path);
+                    path.assign(modulePath)
+                        .append("/")
+                        .append(filePath.filename().string());
+                    cpuContainerPath = modulePath;
+                    break;
+                }
+            }
+        }
+
+        path = decorateName(path);
+        cpus.emplace_back(std::make_unique<phosphor::smbios::Cpu>(
+            bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
+            cpuContainerPath));
+    }
 
     tpm.reset();
     if (getTotalNum(tpmDeviceType) == 1)
