@@ -21,6 +21,8 @@
 #include <boost/algorithm/string.hpp>
 #include <phosphor-logging/elog-errors.hpp>
 
+#include <regex>
+
 namespace phosphor
 {
 namespace smbios
@@ -39,8 +41,12 @@ using EccType =
     sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::Ecc;
 
 static constexpr uint16_t maxOldDimmSize = 0x7fff;
-void Dimm::memoryInfoUpdate(void)
+void Dimm::memoryInfoUpdate(uint8_t* smbiosTableStorage,
+                            const std::string& motherboard)
 {
+    storage = smbiosTableStorage;
+    motherboardPath = motherboard;
+
     uint8_t* dataIn = storage;
 
     dataIn = getSMBIOSTypePtr(dataIn, memoryDeviceType);
@@ -67,6 +73,7 @@ void Dimm::memoryInfoUpdate(void)
 
     memoryTotalWidth(memoryInfo->totalWidth);
     memoryDataWidth(memoryInfo->dataWidth);
+    memoryTotalWidth(memoryInfo->totalWidth);
 
     if (memoryInfo->size == maxOldDimmSize)
     {
@@ -90,6 +97,7 @@ void Dimm::memoryInfoUpdate(void)
     dimmSerialNum(memoryInfo->serialNum, memoryInfo->length, dataIn);
     dimmPartNum(memoryInfo->partNum, memoryInfo->length, dataIn);
     memoryAttributes(memoryInfo->attributes);
+    dimmMedia(memoryInfo->memoryTechnology);
     memoryConfiguredSpeedInMhz(memoryInfo->confClockSpeed);
 
     updateEccType(memoryInfo->phyArrayHandle);
@@ -159,6 +167,12 @@ uint16_t Dimm::memoryDataWidth(uint16_t value)
         memoryDataWidth(value);
 }
 
+uint16_t Dimm::memoryTotalWidth(uint16_t value)
+{
+    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
+        memoryTotalWidth(value);
+}
+
 static constexpr uint16_t baseNewVersionDimmSize = 0x8000;
 static constexpr uint16_t dimmSizeUnit = 1024;
 void Dimm::dimmSize(const uint16_t size)
@@ -187,10 +201,10 @@ void Dimm::dimmDeviceLocator(const uint8_t bankLocatorPositionNum,
                              const uint8_t deviceLocatorPositionNum,
                              const uint8_t structLen, uint8_t* dataIn)
 {
-    std::string deviceLocator =
-        positionToString(deviceLocatorPositionNum, structLen, dataIn);
-    std::string bankLocator =
-        positionToString(bankLocatorPositionNum, structLen, dataIn);
+    std::string deviceLocator = positionToString(deviceLocatorPositionNum,
+                                                 structLen, dataIn);
+    std::string bankLocator = positionToString(bankLocatorPositionNum,
+                                               structLen, dataIn);
 
     std::string result;
     if (bankLocator.empty() || onlyDimmLocationCode)
@@ -205,6 +219,43 @@ void Dimm::dimmDeviceLocator(const uint8_t bankLocatorPositionNum,
     memoryDeviceLocator(result);
 
     locationCode(result);
+    const std::string substrCpu = "CPU";
+    auto cpuPos = deviceLocator.find(substrCpu);
+
+    if (cpuPos != std::string::npos)
+    {
+        std::string socketString =
+            deviceLocator.substr(cpuPos + substrCpu.length(), 1);
+        try
+        {
+            uint8_t socketNum =
+                static_cast<uint8_t>(std::stoi(socketString) + 1);
+            socket(socketNum);
+        }
+        catch (const sdbusplus::exception_t& ex)
+        {
+            phosphor::logging::log<phosphor::logging::level::ERR>(
+                "std::stoi operation failed ",
+                phosphor::logging::entry("ERROR=%s", ex.what()));
+        }
+    }
+
+    const std::string substrDimm = "DIMM";
+    auto dimmPos = deviceLocator.find(substrDimm);
+
+    if (dimmPos != std::string::npos)
+    {
+        std::string slotString =
+            deviceLocator.substr(dimmPos + substrDimm.length() + 1);
+        /* slotString is extracted from substrDimm (DIMM_A) if slotString is
+         * single alphabet like A, B , C.. then assign ASCII value of slotString
+         * to slot */
+        if ((std::regex_match(slotString, std::regex("^[A-Za-z]+$"))) &&
+            (slotString.length() == 1))
+        {
+            slot(static_cast<uint8_t>(toupper(slotString[0])));
+        }
+    }
 }
 
 std::string Dimm::memoryDeviceLocator(std::string value)
@@ -230,6 +281,26 @@ DeviceType Dimm::memoryType(DeviceType value)
 {
     return sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::
         memoryType(value);
+}
+
+void Dimm::dimmMedia(const uint8_t type)
+{
+    std::map<uint8_t, MemoryTechType>::const_iterator it =
+        dimmMemoryTechTypeMap.find(type);
+    if (it == dimmMemoryTechTypeMap.end())
+    {
+        memoryMedia(MemoryTechType::Unknown);
+    }
+    else
+    {
+        memoryMedia(it->second);
+    }
+}
+
+MemoryTechType Dimm::memoryMedia(MemoryTechType value)
+{
+    return sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::
+        memoryMedia(value);
 }
 
 void Dimm::dimmTypeDetail(uint16_t detail)
@@ -322,10 +393,22 @@ std::string Dimm::locationCode(std::string value)
         LocationCode::locationCode(value);
 }
 
-uint8_t Dimm::memoryAttributes(uint8_t value)
+size_t Dimm::memoryAttributes(size_t value)
 {
     return sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::
         memoryAttributes(value);
+}
+
+uint8_t Dimm::slot(uint8_t value)
+{
+    return sdbusplus::server::xyz::openbmc_project::inventory::item::dimm::
+        MemoryLocation::slot(value);
+}
+
+uint8_t Dimm::socket(uint8_t value)
+{
+    return sdbusplus::server::xyz::openbmc_project::inventory::item::dimm::
+        MemoryLocation::socket(value);
 }
 
 uint16_t Dimm::memoryConfiguredSpeedInMhz(uint16_t value)

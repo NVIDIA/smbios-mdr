@@ -34,7 +34,7 @@ namespace phosphor
 namespace smbios
 {
 
-std::string System::uuid(std::string value)
+std::string System::uuid(std::string /* value */)
 {
     uint8_t* dataIn = storage;
     dataIn = getSMBIOSTypePtr(dataIn, systemType);
@@ -73,10 +73,10 @@ static std::string getService(sdbusplus::bus_t& bus,
                               const std::string& objectPath,
                               const std::string& interface)
 {
-    auto method =
-        bus.new_method_call("xyz.openbmc_project.ObjectMapper",
-                            "/xyz/openbmc_project/object_mapper",
-                            "xyz.openbmc_project.ObjectMapper", "GetObject");
+    auto method = bus.new_method_call("xyz.openbmc_project.ObjectMapper",
+                                      "/xyz/openbmc_project/object_mapper",
+                                      "xyz.openbmc_project.ObjectMapper",
+                                      "GetObject");
 
     method.append(objectPath);
     method.append(std::vector<std::string>({interface}));
@@ -120,7 +120,7 @@ static void setProperty(sdbusplus::bus_t& bus, const std::string& objectPath,
     bus.call_noreply(method);
 }
 
-std::string System::version(std::string value)
+std::string System::version(std::string /* value */)
 {
     std::string result = "No BIOS Version";
     uint8_t* dataIn = storage;
@@ -128,13 +128,12 @@ std::string System::version(std::string value)
     if (dataIn != nullptr)
     {
         auto biosInfo = reinterpret_cast<struct BIOSInfo*>(dataIn);
-        uint8_t biosVerByte = biosInfo->biosVersion;
-        std::string tempS =
-            positionToString(biosInfo->biosVersion, biosInfo->length, dataIn);
+        std::string tempS = positionToString(biosInfo->biosVersion,
+                                             biosInfo->length, dataIn);
         if (std::find_if(tempS.begin(), tempS.end(),
                          [](char ch) { return !isprint(ch); }) != tempS.end())
         {
-            std::ofstream smbiosFile(mdrType2File, std::ios_base::trunc);
+            std::ofstream smbiosFile(smbiosFilePath, std::ios_base::trunc);
             if (!smbiosFile.good())
             {
                 phosphor::logging::log<phosphor::logging::level::ERR>(
@@ -150,7 +149,7 @@ std::string System::version(std::string value)
         }
         result = tempS;
 
-        setProperty(bus, biosActiveObjPath, biosVersionIntf, biosVersionProp,
+        setProperty(*bus, biosActiveObjPath, biosVersionIntf, biosVersionProp,
                     result);
     }
     lg2::info("VERSION INFO - BIOS - {VER}", "VER", result);

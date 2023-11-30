@@ -19,10 +19,13 @@
 #include <phosphor-logging/elog-errors.hpp>
 
 #include <array>
+<<<<<<< HEAD
 #include <filesystem>
+=======
+#include <string>
+>>>>>>> origin/master
 
-static constexpr const char* mdrType2File = "/var/lib/smbios/smbios2";
-static constexpr const char* smbiosPath = "/var/lib/smbios";
+static constexpr const char* mdrDefaultFile = "/var/lib/smbios/smbios2";
 
 static constexpr uint16_t mdrSMBIOSSize = 32 * 1024;
 
@@ -33,10 +36,12 @@ constexpr uint8_t maxDirEntries = 4;
 constexpr uint32_t mdr2SMSize = 0x00100000;
 constexpr uint32_t mdr2SMBaseAddress = 0x9FF00000;
 
+constexpr uint8_t mdrDirVersion = 1;
 constexpr uint8_t mdrTypeII = 2;
 
 constexpr uint8_t mdr2Version = 2;
 constexpr uint8_t smbiosAgentVersion = 1;
+constexpr uint8_t smbiosDirVersion = 1;
 
 constexpr uint32_t pageMask = 0xf000;
 constexpr int smbiosDirIndex = 0;
@@ -159,6 +164,7 @@ struct EntryPointStructure30
     uint64_t structTableAddr;
 } __attribute__((packed));
 
+<<<<<<< HEAD
 struct StructureHeader
 {
     uint8_t type;
@@ -176,17 +182,22 @@ static constexpr const char* cpuPath =
 static constexpr const char* cpuPath =
     "/xyz/openbmc_project/inventory/system/chassis/motherboard/cpu";
 #endif
+=======
+static constexpr const char* cpuSuffix = "/chassis/motherboard/cpu";
+>>>>>>> origin/master
 
-static constexpr const char* dimmPath =
-    "/xyz/openbmc_project/inventory/system/chassis/motherboard/dimm";
+static constexpr const char* dimmSuffix = "/chassis/motherboard/dimm";
 
-static constexpr const char* pciePath =
-    "/xyz/openbmc_project/inventory/system/chassis/motherboard/pcieslot";
+static constexpr const char* pcieSuffix = "/chassis/motherboard/pcieslot";
 
+<<<<<<< HEAD
 static constexpr const char* systemPath = "/xyz/openbmc_project/software/bios";
 
 static constexpr const char* tpmPath =
     "/xyz/openbmc_project/inventory/system/chassis/motherboard/tpm";
+=======
+static constexpr const char* systemSuffix = "/chassis/motherboard/bios";
+>>>>>>> origin/master
 
 static constexpr const char* firmwarePath = "/xyz/openbmc_project/software";
 
@@ -323,7 +334,6 @@ static inline uint8_t* getSMBIOSTypePtr(uint8_t* smbiosDataIn, uint8_t typeId,
         uint32_t len = *(smbiosData + 1);
         if (*smbiosData != typeId)
         {
-
             smbiosData += len;
             while ((*smbiosData != '\0') || (*(smbiosData + 1) != '\0'))
             {

@@ -126,7 +126,7 @@ void Cpu::characteristics(uint16_t value)
     {
         if (charBits.test(index))
         {
-            if (cap = characteristicsTable[index])
+            if ((cap = characteristicsTable[index]))
             {
                 result.emplace_back(*cap);
             }
@@ -137,8 +137,12 @@ void Cpu::characteristics(uint16_t value)
 }
 
 static constexpr uint8_t maxOldVersionCount = 0xff;
-void Cpu::infoUpdate(void)
+void Cpu::infoUpdate(uint8_t* smbiosTableStorage,
+                     const std::string& motherboard)
 {
+    storage = smbiosTableStorage;
+    motherboardPath = motherboard;
+
     uint8_t* dataIn = storage;
 
     dataIn = getSMBIOSTypePtr(dataIn, processorsType);
@@ -166,19 +170,29 @@ void Cpu::infoUpdate(void)
     socket(cpuInfo->socketDesignation, cpuInfo->length, dataIn); // offset 4h
 
     constexpr uint32_t socketPopulatedMask = 1 << 6;
+    constexpr uint32_t statusMask = 0x07;
     if ((cpuInfo->status & socketPopulatedMask) == 0)
     {
         // Don't attempt to fill in any other details if the CPU is not present.
         present(false);
+        functional(false);
         return;
     }
     present(true);
+    if ((cpuInfo->status & statusMask) == 1)
+    {
+        functional(true);
+    }
+    else
+    {
+        functional(false);
+    }
 
     // this class is for type CPU  //offset 5h
     family(cpuInfo->family, cpuInfo->family2); // offset 6h and 28h
     manufacturer(cpuInfo->manufacturer, cpuInfo->length,
-                 dataIn); // offset 7h
-    id(cpuInfo->id);      // offset 8h
+                 dataIn);                      // offset 7h
+    id(cpuInfo->id);                           // offset 8h
 
     // Step, EffectiveFamily, EffectiveModel computation for Intel processors.
     std::map<uint8_t, const char*>::const_iterator it =
@@ -226,12 +240,16 @@ void Cpu::infoUpdate(void)
     version(cpuInfo->version, cpuInfo->length, dataIn); // offset 10h
     maxSpeedInMhz(cpuInfo->maxSpeed);                   // offset 14h
     serialNumber(cpuInfo->serialNum, cpuInfo->length,
+<<<<<<< HEAD
                  dataIn); // offset 20h
     assetTagString(cpuInfo->assetTag, cpuInfo->length,
                    dataIn); // offset 21h
+=======
+                 dataIn);                               // offset 20h
+>>>>>>> origin/master
     partNumber(cpuInfo->partNum, cpuInfo->length,
-               dataIn);                          // offset 22h
-    if (cpuInfo->coreCount < maxOldVersionCount) // offset 23h or 2Ah
+               dataIn);                                 // offset 22h
+    if (cpuInfo->coreCount < maxOldVersionCount)        // offset 23h or 2Ah
     {
         coreCount(cpuInfo->coreCount);
     }

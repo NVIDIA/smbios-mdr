@@ -21,6 +21,7 @@
 #include <xyz/openbmc_project/Inventory/Connector/Slot/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/Dimm/MemoryLocation/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Dimm/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/OperationalStatus/server.hpp>
@@ -37,9 +38,14 @@ using DeviceType =
 using EccType =
     sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::Ecc;
 
+using MemoryTechType =
+    sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::MemoryTech;
+
 class Dimm :
     sdbusplus::server::object_t<
         sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm>,
+    sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
+                                    inventory::item::dimm::MemoryLocation>,
     sdbusplus::server::object_t<
         sdbusplus::server::xyz::openbmc_project::inventory::decorator::Asset>,
     sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
@@ -69,6 +75,9 @@ class Dimm :
             sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm>(
             bus, objPath.c_str()),
         sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
+                                        inventory::item::dimm::MemoryLocation>(
+            bus, objPath.c_str()),
+        sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
                                         inventory::decorator::Asset>(
             bus, objPath.c_str()),
         sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
@@ -86,16 +95,17 @@ class Dimm :
         sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
                                         state::decorator::OperationalStatus>(
             bus, objPath.c_str()),
-        dimmNum(dimmId), storage(smbiosTableStorage),
-        motherboardPath(motherboard)
+        dimmNum(dimmId)
     {
-        memoryInfoUpdate();
+        memoryInfoUpdate(smbiosTableStorage, motherboard);
     }
 
-    void memoryInfoUpdate(void);
+    void memoryInfoUpdate(uint8_t* smbiosTableStorage,
+                          const std::string& motherboard);
 
     uint16_t memoryTotalWidth(uint16_t value) override;
     uint16_t memoryDataWidth(uint16_t value) override;
+    uint16_t memoryTotalWidth(uint16_t value) override;
     size_t memorySizeInKB(size_t value) override;
     std::string memoryDeviceLocator(std::string value) override;
     DeviceType memoryType(DeviceType value) override;
@@ -106,7 +116,10 @@ class Dimm :
     std::string serialNumber(std::string value) override;
     std::string partNumber(std::string value) override;
     std::string locationCode(std::string value) override;
-    uint8_t memoryAttributes(uint8_t value) override;
+    size_t memoryAttributes(size_t value) override;
+    MemoryTechType memoryMedia(MemoryTechType value) override;
+    uint8_t slot(uint8_t value) override;
+    uint8_t socket(uint8_t value) override;
     uint16_t memoryConfiguredSpeedInMhz(uint16_t value) override;
     bool functional(bool value) override;
     EccType ecc(EccType value) override;
@@ -127,6 +140,7 @@ class Dimm :
     void dimmTypeDetail(const uint16_t detail);
     void dimmManufacturer(const uint8_t positionNum, const uint8_t structLen,
                           uint8_t* dataIn);
+    void dimmMedia(const uint8_t type);
     void dimmSerialNum(const uint8_t positionNum, const uint8_t structLen,
                        uint8_t* dataIn);
     void dimmPartNum(const uint8_t positionNum, const uint8_t structLen,
@@ -230,6 +244,12 @@ const std::map<uint8_t, EccType> dimmEccTypeMap = {
     {0x3, EccType::NoECC},        {0x4, EccType::AddressParity},
     {0x5, EccType::SingleBitECC}, {0x6, EccType::MultiBitECC},
     {0x7, EccType::NoECC}};
+
+const std::map<uint8_t, MemoryTechType> dimmMemoryTechTypeMap = {
+    {0x1, MemoryTechType::Other},      {0x2, MemoryTechType::Unknown},
+    {0x3, MemoryTechType::DRAM},       {0x4, MemoryTechType::NVDIMM_N},
+    {0x5, MemoryTechType::NVDIMM_F},   {0x6, MemoryTechType::NVDIMM_P},
+    {0x7, MemoryTechType::IntelOptane}};
 
 } // namespace smbios
 
