@@ -17,14 +17,10 @@
 #pragma once
 #include "smbios_mdrv2.hpp"
 
-<<<<<<< HEAD
-#include <xyz/openbmc_project/Association/Definitions/server.hpp>
-=======
 #include <sdbusplus/asio/connection.hpp>
->>>>>>> origin/master
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
-#include <xyz/openbmc_project/Software/Version/server.hpp>
+
 
 namespace phosphor
 {
@@ -32,29 +28,11 @@ namespace phosphor
 namespace smbios
 {
 
-<<<<<<< HEAD
-using uuidIntf = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Common::server::UUID>;
-using revisionIntf = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Revision>;
-using associationIntf = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Association::server::Definitions>;
-using softwareversionIntf = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Software::server::Version>;
-class System : uuidIntf, revisionIntf, associationIntf, softwareversionIntf
-||||||| 5961693
 class System :
     sdbusplus::server::object_t<
         sdbusplus::xyz::openbmc_project::Common::server::UUID>,
     sdbusplus::server::object_t<
         sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Revision>
-=======
-class System :
-    sdbusplus::server::object_t<
-        sdbusplus::server::xyz::openbmc_project::common::UUID>,
-    sdbusplus::server::object_t<
-        sdbusplus::server::xyz::openbmc_project::inventory::decorator::Revision>
->>>>>>> origin/master
 {
   public:
     System() = delete;
@@ -64,54 +42,21 @@ class System :
     System(System&&) = default;
     System& operator=(System&&) = default;
 
-<<<<<<< HEAD
-    System(sdbusplus::bus_t& bus, const std::string& objPath,
-           uint8_t* smbiosTableStorage) :
-<<<<<<< HEAD
-        uuidIntf(bus, objPath.c_str()),
-        revisionIntf(bus, objPath.c_str()),
-        associationIntf(bus, objPath.c_str()),
-        softwareversionIntf(bus, objPath.c_str()), bus(bus), path(objPath),
-        storage(smbiosTableStorage)
-||||||| 5961693
-        sdbusplus::server::object_t<
-            sdbusplus::xyz::openbmc_project::Common::server::UUID>(
-            bus, objPath.c_str()),
-        bus(bus),
-        sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
-                                        Decorator::server::Revision>(
-            bus, objPath.c_str()),
-        path(objPath), storage(smbiosTableStorage)
-=======
-=======
     System(std::shared_ptr<sdbusplus::asio::connection> bus,
            std::string objPath, uint8_t* smbiosTableStorage,
            std::string filePath) :
->>>>>>> origin/master
         sdbusplus::server::object_t<
             sdbusplus::server::xyz::openbmc_project::common::UUID>(
             *bus, objPath.c_str()),
         sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
                                         inventory::decorator::Revision>(
-<<<<<<< HEAD
-            bus, objPath.c_str()),
-        path(objPath), storage(smbiosTableStorage)
->>>>>>> origin/master
-=======
             *bus, objPath.c_str()),
         bus(std::move(bus)), path(std::move(objPath)),
         storage(smbiosTableStorage), smbiosFilePath(std::move(filePath))
->>>>>>> origin/master
     {
         std::string input = "0";
         uuid(input);
         version("0.00");
-        std::vector<std::tuple<std::string, std::string, std::string>>
-            biosAssociation = {{"software_version", "functional",
-                                "/xyz/openbmc_project/software"}};
-        associationIntf::associations(biosAssociation);
-        softwareversionIntf::purpose(softwareversionIntf::VersionPurpose::Host);
-        softwareversionIntf::version(revisionIntf::version());
     }
 
     std::string uuid(std::string value) override;

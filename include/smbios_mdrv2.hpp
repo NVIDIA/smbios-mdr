@@ -19,11 +19,8 @@
 #include <phosphor-logging/elog-errors.hpp>
 
 #include <array>
-<<<<<<< HEAD
 #include <filesystem>
-=======
 #include <string>
->>>>>>> origin/master
 
 static constexpr const char* mdrDefaultFile = "/var/lib/smbios/smbios2";
 
@@ -164,7 +161,6 @@ struct EntryPointStructure30
     uint64_t structTableAddr;
 } __attribute__((packed));
 
-<<<<<<< HEAD
 struct StructureHeader
 {
     uint8_t type;
@@ -182,22 +178,17 @@ static constexpr const char* cpuPath =
 static constexpr const char* cpuPath =
     "/xyz/openbmc_project/inventory/system/chassis/motherboard/cpu";
 #endif
-=======
 static constexpr const char* cpuSuffix = "/chassis/motherboard/cpu";
->>>>>>> origin/master
 
 static constexpr const char* dimmSuffix = "/chassis/motherboard/dimm";
 
 static constexpr const char* pcieSuffix = "/chassis/motherboard/pcieslot";
 
-<<<<<<< HEAD
 static constexpr const char* systemPath = "/xyz/openbmc_project/software/bios";
 
 static constexpr const char* tpmPath =
     "/xyz/openbmc_project/inventory/system/chassis/motherboard/tpm";
-=======
 static constexpr const char* systemSuffix = "/chassis/motherboard/bios";
->>>>>>> origin/master
 
 static constexpr const char* firmwarePath = "/xyz/openbmc_project/software";
 

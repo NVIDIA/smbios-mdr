@@ -15,6 +15,8 @@ executable(
   'dimm.cpp',
   'system.cpp',
   'pcieslot.cpp',
+  'firmware.cpp',
+  'tpm.cpp',
   cpp_args: cpp_args_smbios,
   dependencies: [
     boost_dep,

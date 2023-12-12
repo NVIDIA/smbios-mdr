@@ -126,7 +126,7 @@ class MDRV2 :
         lg2::info("SMBIOS inventory path: {I}", "I", smbiosInventoryPath);
 
         interfaceAddedMatch = std::make_unique<sdbusplus::bus::match_t>(
-            bus,
+            *bus,
             sdbusplus::bus::match::rules::interfacesAdded() +
                 sdbusplus::bus::match::rules::argNpath(
                     0, "/xyz/openbmc_project/inventory/"),
@@ -222,16 +222,10 @@ class MDRV2 :
     inline uint8_t smbiosValidFlag(uint8_t index);
     void systemInfoUpdate(void);
 
-<<<<<<< HEAD
-    int getTotalCpuSlot(void);
-    int getTotalDimmSlot(void);
-    int getTotalPcieSlot(void);
-    int getTotalNum(uint8_t typeId, size_t minSize = 0);
-=======
     std::optional<size_t> getTotalCpuSlot(void);
     std::optional<size_t> getTotalDimmSlot(void);
     std::optional<size_t> getTotalPcieSlot(void);
->>>>>>> origin/master
+    std::optional<size_t> getTotalNum(uint8_t typeId, size_t minSize = 0);
     std::vector<std::unique_ptr<Cpu>> cpus;
     std::vector<std::unique_ptr<Dimm>> dimms;
     std::vector<std::unique_ptr<Pcie>> pcies;
@@ -240,15 +234,12 @@ class MDRV2 :
     std::vector<std::unique_ptr<Firmware>> firmwareCollection;
     std::vector<std::unique_ptr<Baseboard>> baseboards;
     std::shared_ptr<sdbusplus::asio::dbus_interface> smbiosInterface;
-<<<<<<< HEAD
     std::unique_ptr<sdbusplus::bus::match_t> interfaceAddedMatch;
-=======
 
     std::string smbiosFilePath;
     std::string smbiosObjectPath;
     std::string smbiosInventoryPath;
     std::unique_ptr<sdbusplus::bus::match_t> motherboardConfigMatch;
->>>>>>> origin/master
 };
 
 } // namespace smbios

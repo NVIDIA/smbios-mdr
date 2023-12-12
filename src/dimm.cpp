@@ -167,12 +167,6 @@ uint16_t Dimm::memoryDataWidth(uint16_t value)
         memoryDataWidth(value);
 }
 
-uint16_t Dimm::memoryTotalWidth(uint16_t value)
-{
-    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
-        memoryTotalWidth(value);
-}
-
 static constexpr uint16_t baseNewVersionDimmSize = 0x8000;
 static constexpr uint16_t dimmSizeUnit = 1024;
 void Dimm::dimmSize(const uint16_t size)

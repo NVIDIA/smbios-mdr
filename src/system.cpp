@@ -153,16 +153,7 @@ std::string System::version(std::string /* value */)
                     result);
     }
     lg2::info("VERSION INFO - BIOS - {VER}", "VER", result);
-<<<<<<< HEAD
-    softwareversionIntf::version(result);
-    return sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
-||||||| 5961693
-
-    return sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
-=======
-
     return sdbusplus::server::xyz::openbmc_project::inventory::decorator::
->>>>>>> origin/master
         Revision::version(result);
 }
 

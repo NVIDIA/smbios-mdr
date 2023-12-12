@@ -240,13 +240,9 @@ void Cpu::infoUpdate(uint8_t* smbiosTableStorage,
     version(cpuInfo->version, cpuInfo->length, dataIn); // offset 10h
     maxSpeedInMhz(cpuInfo->maxSpeed);                   // offset 14h
     serialNumber(cpuInfo->serialNum, cpuInfo->length,
-<<<<<<< HEAD
                  dataIn); // offset 20h
     assetTagString(cpuInfo->assetTag, cpuInfo->length,
                    dataIn); // offset 21h
-=======
-                 dataIn);                               // offset 20h
->>>>>>> origin/master
     partNumber(cpuInfo->partNum, cpuInfo->length,
                dataIn);                                 // offset 22h
     if (cpuInfo->coreCount < maxOldVersionCount)        // offset 23h or 2Ah

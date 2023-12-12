@@ -1,6 +1,7 @@
 #pragma once
 #include "smbios_mdrv2.hpp"
 
+#include <sdbusplus/asio/connection.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/server.hpp>
@@ -13,13 +14,13 @@ namespace smbios
 {
 
 using associationIntf = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Association::server::Definitions>;
+    sdbusplus::server::xyz::openbmc_project::association::Definitions>;
 using assetIntf = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset>;
+    sdbusplus::server::xyz::openbmc_project::inventory::decorator::Asset>;
 using itemIntf = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Inventory::server::Item>;
+    sdbusplus::server::xyz::openbmc_project::inventory::Item>;
 using softwareversionIntf = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Software::server::Version>;
+    sdbusplus::server::xyz::openbmc_project::software::Version>;
 class Firmware : associationIntf, assetIntf, itemIntf, softwareversionIntf
 {
   public:
@@ -30,11 +31,11 @@ class Firmware : associationIntf, assetIntf, itemIntf, softwareversionIntf
     Firmware(Firmware&&) = default;
     Firmware& operator=(Firmware&&) = default;
 
-    Firmware(sdbusplus::bus_t& bus, const std::string& objPath, int index,
+    Firmware(std::shared_ptr<sdbusplus::asio::connection> bus, const std::string& objPath, int index,
              uint8_t* smbiosTableStorage) :
-        associationIntf(bus, objPath.c_str()),
-        assetIntf(bus, objPath.c_str()), itemIntf(bus, objPath.c_str()),
-        softwareversionIntf(bus, objPath.c_str()), path(objPath),
+        associationIntf(*bus, objPath.c_str()),
+        assetIntf(*bus, objPath.c_str()), itemIntf(*bus, objPath.c_str()),
+        softwareversionIntf(*bus, objPath.c_str()), path(objPath),
         storage(smbiosTableStorage), index(index)
     {
         firmwareInfoUpdate();
@@ -70,7 +71,7 @@ class Firmware : associationIntf, assetIntf, itemIntf, softwareversionIntf
         uint16_t characteristics;
         uint8_t state;
         uint8_t numOfAssociatedComponents;
-        uint16_t associatedComponentHandles[];
+        uint16_t* associatedComponentHandles;
     } __attribute__((packed));
 
     void firmwareComponentName(const uint8_t positionNum,

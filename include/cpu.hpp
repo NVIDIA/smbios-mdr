@@ -40,48 +40,23 @@ namespace smbios
 using rev =
     sdbusplus::server::xyz::openbmc_project::inventory::decorator::Revision;
 using asset =
-<<<<<<< HEAD
-    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset;
-using assetTagType =
-    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::AssetTag;
-||||||| 5961693
-    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset;
-=======
     sdbusplus::server::xyz::openbmc_project::inventory::decorator::Asset;
->>>>>>> origin/master
+using assetTagType =
+    sdbusplus::server::xyz::openbmc_project::inventory::decorator::AssetTag;
 using location =
     sdbusplus::server::xyz::openbmc_project::inventory::decorator::LocationCode;
 using connector =
-<<<<<<< HEAD
-    sdbusplus::xyz::openbmc_project::Inventory::Connector::server::Slot;
-using processor = sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu;
-using chassis =
-    sdbusplus::xyz::openbmc_project::Inventory::Item::server::Chassis;
-using Item = sdbusplus::xyz::openbmc_project::Inventory::server::Item;
-||||||| 5961693
-    sdbusplus::xyz::openbmc_project::Inventory::Connector::server::Slot;
-using processor = sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu;
-using Item = sdbusplus::xyz::openbmc_project::Inventory::server::Item;
-=======
     sdbusplus::server::xyz::openbmc_project::inventory::connector::Slot;
+using chassis =
+    sdbusplus::server::xyz::openbmc_project::inventory::item::Chassis;
 using processor = sdbusplus::server::xyz::openbmc_project::inventory::item::Cpu;
 using Item = sdbusplus::server::xyz::openbmc_project::inventory::Item;
->>>>>>> origin/master
 using association =
-<<<<<<< HEAD
-    sdbusplus::xyz::openbmc_project::Association::server::Definitions;
-using instance =
-    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Instance;
-||||||| 5961693
-    sdbusplus::xyz::openbmc_project::Association::server::Definitions;
-=======
     sdbusplus::server::xyz::openbmc_project::association::Definitions;
-<<<<<<< HEAD
->>>>>>> origin/master
-=======
-using operationalStatus = sdbusplus::xyz::openbmc_project::State::Decorator::
-    server::OperationalStatus;
->>>>>>> origin/master
+using operationalStatus = 
+    sdbusplus::xyz::openbmc_project::State::Decorator::server::OperationalStatus;
+using instance =
+    sdbusplus::server::xyz::openbmc_project::inventory::decorator::Instance;
 
 // This table is up to date as of SMBIOS spec DSP0134 3.7.0
 static const std::map<uint8_t, const char*> familyTable = {
@@ -343,14 +318,9 @@ static const std::array<std::optional<processor::Capability>, 16>
                          std::nullopt};
 
 class Cpu :
-<<<<<<< HEAD
     sdbusplus::server::object_t<processor, asset, assetTagType, location,
                                 connector, rev, Item, association, instance,
-                                chassis>
-=======
-    sdbusplus::server::object_t<processor, asset, location, connector, rev,
-                                Item, association, operationalStatus>
->>>>>>> origin/master
+                                chassis, operationalStatus>
 {
   public:
     Cpu() = delete;
@@ -362,15 +332,9 @@ class Cpu :
 
     Cpu(sdbusplus::bus_t& bus, const std::string& objPath, const uint8_t& cpuId,
         uint8_t* smbiosTableStorage, const std::string& motherboard) :
-<<<<<<< HEAD
         sdbusplus::server::object_t<processor, asset, assetTagType, location,
                                     connector, rev, Item, association, instance,
-                                    chassis>(bus, objPath.c_str()),
-=======
-        sdbusplus::server::object_t<processor, asset, location, connector, rev,
-                                    Item, association, operationalStatus>(
-            bus, objPath.c_str()),
->>>>>>> origin/master
+                                    chassis, operationalStatus>(bus, objPath.c_str()),
         cpuNum(cpuId), storage(smbiosTableStorage), motherboardPath(motherboard)
     {
         infoUpdate(smbiosTableStorage, motherboard);
@@ -379,7 +343,7 @@ class Cpu :
     void infoUpdate(uint8_t* smbiosTableStorage,
                     const std::string& motherboard);
 
-    static inline auto socketChipNumber(const std::string socketDesignation)
+    static inline auto socketChipNumber([[maybe_unused]]const std::string socketDesignation)
     {
         bool found = false;
         size_t socket = 0;

@@ -91,7 +91,7 @@ class Pcie :
         uint8_t deviceNum;
         uint8_t dataBusWidth;
         uint8_t peerGorupingCount;
-        PeerGroup peerGroups[];
+        PeerGroup* peerGroups;
     } __attribute__((packed));
 
     struct SystemSlotInfoAfterPeerGroups

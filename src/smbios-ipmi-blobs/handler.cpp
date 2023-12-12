@@ -213,23 +213,9 @@ bool SmbiosBlobHandler::commit(uint16_t session,
         }
     }
 
-<<<<<<< HEAD
-=======
-    std::ofstream smbiosFile(mdrDefaultFile,
-                             std::ios_base::binary | std::ios_base::trunc);
-    if (!smbiosFile.good())
-    {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "Write data from flash error - Open SMBIOS table file failure");
-        blobPtr->state |= blobs::StateFlags::commit_error;
-        return false;
-    }
-
-    smbiosFile.exceptions(std::ofstream::badbit | std::ofstream::failbit);
->>>>>>> origin/master
     try
     {
-        std::ofstream smbiosFile(mdrType2File,
+        std::ofstream smbiosFile(mdrDefaultFile,
                                  std::ios_base::binary | std::ios_base::trunc);
         if (!smbiosFile.good())
         {
