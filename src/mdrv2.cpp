@@ -447,7 +447,7 @@ void MDRV2::systemInfoUpdate()
                 }
             }
         }
-        if (motherboardPath.empty())
+        if (motherboardPath.empty() && subtree.size() != 0)
         {
             motherboardPath = subtree.begin()->first;
         }
@@ -501,7 +501,7 @@ void MDRV2::systemInfoUpdate()
                     std::variant<uint64_t> instanceNumber;
                     sdbusplus::message_t getInstanceMethod =
                         bus->new_method_call(service.c_str(), path.c_str(),
-                                            "org.freedesktop.Dbus->Properties",
+                                            "org.freedesktop.DBus.Properties",
                                             "Get");
                     getInstanceMethod.append(interface, "InstanceNumber");
                     try
@@ -572,23 +572,39 @@ void MDRV2::systemInfoUpdate()
 
     for (unsigned int index = 0; index < *num; index++)
     {
-        std::string path = smbiosInventoryPath + cpuSuffix +
-                           std::to_string(index);
-        if (index + 1 > cpus.size())
+        std::string path = cpuPath + std::to_string(index);
+        std::string cpuContainerPath = motherboardPath;
+
+        // customize path if we know the socket number
+        auto dataPtr = getSMBIOSTypeIndexPtr(
+            smbiosDir.dir[smbiosDirIndex].dataStorage, processorsType, index);
+        auto [found, socket, chip] = Cpu::socketChipNumber(dataPtr);
+        if (found && modules.size())
         {
-            cpus.emplace_back(std::make_unique<phosphor::smbios::Cpu>(
-                *bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
-                motherboardPath));
+            for (auto& [modulePath, moduleIntanceOpt] : modules)
+            {
+                if (modules.size() == 1 || (moduleIntanceOpt.has_value() &&
+                                            *moduleIntanceOpt == socket))
+                {
+                    // make the cpu under socket path
+                    std::filesystem::path filePath(path);
+                    path.assign(modulePath)
+                        .append("/")
+                        .append(filePath.filename().string());
+                    cpuContainerPath = modulePath;
+                    break;
+                }
+            }
         }
-        else
-        {
-            cpus[index]->infoUpdate(smbiosDir.dir[smbiosDirIndex].dataStorage,
-                                    motherboardPath);
-        }
+
+        path = decorateName(path);
+        cpus.emplace_back(std::make_unique<phosphor::smbios::Cpu>(
+            *bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
+            cpuContainerPath));
     }
 
 #ifdef DIMM_DBUS
-
+    dimms.clear();
     num = getTotalDimmSlot();
     if (!num)
     {
@@ -605,19 +621,30 @@ void MDRV2::systemInfoUpdate()
 
     for (unsigned int index = 0; index < *num; index++)
     {
-        std::string path = smbiosInventoryPath + dimmSuffix +
-                           std::to_string(index);
-        if (index + 1 > dimms.size())
+        std::string objName = "Memory_" + std::to_string(index);
+
+        // Rename the object if it's contaned by a board
+        uint8_t* dataIn = smbiosDir.dir[smbiosDirIndex].dataStorage;
+        dataIn = getSMBIOSTypeIndexPtr(dataIn, memoryDeviceType, index);
+        auto memoryHeader = reinterpret_cast<struct StructureHeader*>(dataIn);
+        for (const auto& baseboard : baseboards)
         {
-            dimms.emplace_back(std::make_unique<phosphor::smbios::Dimm>(
-                *bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
-                motherboardPath));
+            auto [found, indexOfType] =
+                baseboard->findIndexOfType(memoryHeader->handle);
+            if (found == true)
+            {
+                objName = baseboard->getName() + "_" + "Memory_" +
+                          std::to_string(indexOfType);
+                break;
+            }
         }
-        else
-        {
-            dimms[index]->memoryInfoUpdate(
-                smbiosDir.dir[smbiosDirIndex].dataStorage, motherboardPath);
-        }
+
+        std::string path(defaultMotherboardPath);
+        path += "/" + objName;
+        path = decorateName(path);
+        dimms.emplace_back(std::make_unique<phosphor::smbios::Dimm>(
+            *bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
+            motherboardPath));
     }
 
 #endif
@@ -652,10 +679,6 @@ void MDRV2::systemInfoUpdate()
                 smbiosDir.dir[smbiosDirIndex].dataStorage, motherboardPath);
         }
     }
-
-    system.reset();
-    system = std::make_unique<System>(
-        bus, systemPath, smbiosDir.dir[smbiosDirIndex].dataStorage, smbiosFilePath);
 
     tpm.reset();
     if (getTotalNum(tpmDeviceType) == 1)
@@ -997,7 +1020,20 @@ bool MDRV2::agentSynchronizeData()
         return false;
     }
 
-    systemInfoUpdate();
+    // Defer systemInfoUpdate() to speed up reply
+    std::chrono::microseconds usec(
+        defaultTimeout);
+    timer.expires_after(usec);
+    timer.async_wait([this](boost::system::error_code ec) {
+        if (ec || this == nullptr)
+        {
+            phosphor::logging::log<phosphor::logging::level::ERR>(
+                "Timer Error!");
+            return;
+        }
+        systemInfoUpdate();
+    });
+
     smbiosDir.dir[smbiosDirIndex].common.dataVersion = mdr2SMBIOS.dirVer;
     smbiosDir.dir[smbiosDirIndex].common.timestamp = mdr2SMBIOS.timestamp;
     smbiosDir.dir[smbiosDirIndex].common.size = mdr2SMBIOS.dataSize;

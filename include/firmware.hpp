@@ -71,7 +71,7 @@ class Firmware : associationIntf, assetIntf, itemIntf, softwareversionIntf
         uint16_t characteristics;
         uint8_t state;
         uint8_t numOfAssociatedComponents;
-        uint16_t* associatedComponentHandles;
+        uint16_t associatedComponentHandles[1];
     } __attribute__((packed));
 
     void firmwareComponentName(const uint8_t positionNum,

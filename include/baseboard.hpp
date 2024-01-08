@@ -45,7 +45,7 @@ class Baseboard
         uint16_t chassisHandle;
         uint8_t boardType;
         uint8_t numOfContainedObject;
-        uint16_t* containedObjectHandles;
+        uint16_t containedObjectHandles[1];
     } __attribute__((packed));
 
     Baseboard() = delete;
