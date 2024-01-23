@@ -15,6 +15,7 @@
 */
 
 #pragma once
+#include "config.h"
 #include "smbios_mdrv2.hpp"
 
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>

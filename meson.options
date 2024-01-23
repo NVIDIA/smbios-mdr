@@ -32,3 +32,10 @@ option(
   value: 'enabled',
   description: 'Build IPMI blob library for SMBIOS transfer'
 )
+
+option(
+  'nvidia',
+  type: 'boolean',
+  value: 'false',
+  description: 'Enable NVIDIA features'
+)

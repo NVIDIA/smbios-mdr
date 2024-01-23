@@ -23,5 +23,6 @@ sdbusplus_dep = dependency('sdbusplus')
 phosphor_dbus_interfaces_dep= dependency('phosphor-dbus-interfaces')
 phosphor_logging_dep = dependency('phosphor-logging')
 
+subdir('include')
 subdir('src')
 subdir('service_files')
