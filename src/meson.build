@@ -7,6 +7,14 @@ if get_option('dimm-only-locator').allowed()
   cpp_args_smbios += ['-DDIMM_ONLY_LOCATOR']
 endif
 
+if get_option('nvidia')
+  cpp_args_smbios += ['-DNVIDIA']
+endif
+
+if get_option('expose-inventory')
+  cpp_args_smbios += ['-DEXPOSE_FW_INVENTORY']
+endif
+
 executable(
   'smbiosmdrv2app',
   'mdrv2.cpp',

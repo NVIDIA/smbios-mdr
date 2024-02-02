@@ -39,3 +39,38 @@ option(
   value: 'false',
   description: 'Enable NVIDIA features'
 )
+
+option(
+  'expose-inventory',
+  type: 'boolean',
+  value: 'false',
+  description: 'Process Type 45 and report fw version'
+)
+
+option(
+  'firmware-component-name-bmc',
+  type: 'string',
+  value: '',
+  description: 'BMC firmware component name in Type 45, it is used to avoid duplicated version object'
+)
+
+option(
+  'firmware-component-name-bios',
+  type: 'string',
+  value: '',
+  description: 'BIOS firmware component name in Type 45, it is used to avoid duplicated version object'
+)
+
+option(
+  'firmware-component-name-tpm',
+  type: 'string',
+  value: '',
+  description: 'TPM firmware component name in Type 45, it is used to avoid duplicated version object'
+)
+
+option(
+  'platform-prefix',
+  type: 'string',
+  value: '',
+  description: 'Platform prefix, it prepend to DBus object name, such as ${PLATFORM_PREFIX}_CPU_0'
+)
