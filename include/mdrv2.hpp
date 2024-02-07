@@ -112,7 +112,7 @@ class MDR_V2 :
                 {
                     if (interestedInterfaces.contains(intf))
                     {
-                        agentSynchronizeData();
+                        systemInfoUpdate();
                     }
                 }
             });

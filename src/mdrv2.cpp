@@ -968,6 +968,7 @@ bool MDR_V2::checkSMBIOSVersion(uint8_t* dataIn)
 bool MDR_V2::agentSynchronizeData()
 {
     struct MDRSMBIOSHeader mdr2SMBIOS;
+    std::fill_n(smbiosDir.dir[smbiosDirIndex].dataStorage, smbiosTableStorageSize, 0);
     bool status = readDataFromFlash(&mdr2SMBIOS,
                                     smbiosDir.dir[smbiosDirIndex].dataStorage);
     if (!status)
