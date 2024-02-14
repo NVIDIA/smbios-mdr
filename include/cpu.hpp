@@ -394,6 +394,8 @@ class Cpu :
 
     std::string motherboardPath;
 
+    std::string objPath;
+
     struct ProcessorInfo
     {
         uint8_t type;

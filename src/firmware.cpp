@@ -25,15 +25,19 @@ void Firmware::firmwareInfoUpdate(void)
 
     firmwareComponentName(firmwareInfo->componentName, firmwareInfo->length,
                           dataIn);
+#ifdef EXPOSE_FW_INVENTORY
     firmwareVersion(firmwareInfo->Version, firmwareInfo->length, dataIn);
     firmwareId(firmwareInfo->Id, firmwareInfo->length, dataIn);
+#endif
     firmwareReleaseDate(firmwareInfo->releaseDate, firmwareInfo->length,
                         dataIn);
     firmwareManufacturer(firmwareInfo->manufacturer, firmwareInfo->length,
                          dataIn);
 
     present(true);
+#ifdef EXPOSE_FW_INVENTORY
     purpose(softwareversionIntf::VersionPurpose::Other);
+#endif
     std::vector<std::tuple<std::string, std::string, std::string>> association =
         {{"software_version", "functional", "/xyz/openbmc_project/software"}};
     associationIntf::associations(association);
@@ -109,7 +113,7 @@ void Firmware::firmwareComponentName(const uint8_t positionNum,
     std::string result = positionToString(positionNum, structLen, dataIn);
     prettyName(result);
 }
-
+#ifdef EXPOSE_FW_INVENTORY
 void Firmware::firmwareVersion(const uint8_t positionNum,
                                const uint8_t structLen, uint8_t* dataIn)
 {
@@ -123,6 +127,7 @@ void Firmware::firmwareId(const uint8_t positionNum, const uint8_t structLen,
     std::string result = positionToString(positionNum, structLen, dataIn);
     softwareId(result);
 }
+#endif
 
 void Firmware::firmwareReleaseDate(const uint8_t positionNum,
                                    const uint8_t structLen, uint8_t* dataIn)

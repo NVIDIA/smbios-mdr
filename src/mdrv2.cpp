@@ -428,6 +428,7 @@ void MDRV2::systemInfoUpdate()
             phosphor::logging::log<phosphor::logging::level::ERR>(
                 "Failed to get system motherboard dbus path.");
         }
+
         // If we found more than 1 system, select one with chassis intf
         if (subtree.size() > 1)
         {
@@ -449,6 +450,7 @@ void MDRV2::systemInfoUpdate()
         }
         if (motherboardPath.empty() && subtree.size() != 0)
         {
+
             motherboardPath = subtree.begin()->first;
         }
     }
@@ -769,6 +771,12 @@ void MDRV2::systemInfoUpdate()
         path.append("/").append(objName);
         try
         {
+            std::string cp = path;
+            std::transform(cp.begin(), cp.end(), cp.begin(), ::tolower);
+
+            if (cp.find("psu") != std::string::npos)
+                continue;
+
             firmwareCollection.emplace_back(
                 std::make_unique<phosphor::smbios::Firmware>(
                     bus, path, index,
