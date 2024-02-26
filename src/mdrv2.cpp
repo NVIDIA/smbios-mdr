@@ -702,6 +702,13 @@ void MDR_V2::systemInfoUpdate()
             continue;
         }
 #endif
+#ifdef FIRMWARE_COMPONENT_NAME_CX7
+        std::string cx7ComponentName(FIRMWARE_COMPONENT_NAME_CX7);
+        if ((firmwareName.rfind(cx7ComponentName, 0) == 0) && system != nullptr)
+        {
+            continue;
+        }
+#endif
 #ifdef FIRMWARE_COMPONENT_NAME_TPM
         std::string tpmComponentName(FIRMWARE_COMPONENT_NAME_TPM);
         if (tpmComponentName == firmwareName && tpm != nullptr)

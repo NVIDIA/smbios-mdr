@@ -82,6 +82,11 @@ if(NOT FIRMWARE_COMPONENT_NAME_BIOS STREQUAL "")
   add_compile_definitions(FIRMWARE_COMPONENT_NAME_BIOS="${FIRMWARE_COMPONENT_NAME_BIOS}")
 endif()
 
+set(FIRMWARE_COMPONENT_NAME_CX7 "" CACHE STRING "CX7 firmware component name in Type 45, it is used to avoid duplicated version object")
+if(NOT FIRMWARE_COMPONENT_NAME_CX7 STREQUAL "")
+  add_compile_definitions(FIRMWARE_COMPONENT_NAME_CX7="${FIRMWARE_COMPONENT_NAME_CX7}")
+endif()
+
 set(FIRMWARE_COMPONENT_NAME_TPM "" CACHE STRING "TPM firmware component name in Type 45, it is used to avoid duplicated version object")
 if(NOT FIRMWARE_COMPONENT_NAME_TPM STREQUAL "")
   add_compile_definitions(FIRMWARE_COMPONENT_NAME_TPM="${FIRMWARE_COMPONENT_NAME_TPM}")
