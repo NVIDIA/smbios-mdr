@@ -741,6 +741,13 @@ void MDRV2::systemInfoUpdate()
             continue;
         }
 #endif
+#ifdef FIRMWARE_COMPONENT_NAME_CX7
+        std::string cx7ComponentName(FIRMWARE_COMPONENT_NAME_CX7);
+        if ((firmwareName.rfind(cx7ComponentName, 0) == 0) && system != nullptr)
+        {
+            continue;
+        }
+#endif
 #ifdef FIRMWARE_COMPONENT_NAME_TPM
         std::string tpmComponentName(FIRMWARE_COMPONENT_NAME_TPM);
         if (tpmComponentName == firmwareName && tpm != nullptr)
@@ -1012,6 +1019,7 @@ bool MDRV2::checkSMBIOSVersion(uint8_t* dataIn)
 bool MDRV2::agentSynchronizeData()
 {
     struct MDRSMBIOSHeader mdr2SMBIOS;
+    std::fill_n(smbiosDir.dir[smbiosDirIndex].dataStorage, smbiosTableStorageSize, 0);
     bool status = readDataFromFlash(&mdr2SMBIOS,
                                     smbiosDir.dir[smbiosDirIndex].dataStorage);
     if (!status)

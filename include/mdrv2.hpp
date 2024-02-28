@@ -151,7 +151,7 @@ class MDRV2 :
                 {
                     if (interestedInterfaces.contains(intf))
                     {
-                        agentSynchronizeData();
+                        systemInfoUpdate();
                     }
                 }
             });
