@@ -179,6 +179,10 @@ void Cpu::infoUpdate(uint8_t* smbiosTableStorage,
         return;
     }
     present(true);
+
+    // the default value is unknown, set to Component when CPU exists
+    chassis::type(Chassis::ChassisType::Component);
+
     if ((cpuInfo->status & statusMask) == 1)
     {
         functional(true);
