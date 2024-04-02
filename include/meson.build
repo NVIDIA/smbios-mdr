@@ -13,6 +13,14 @@ if get_option('firmware-component-name-tpm') != ''
 conf_data.set_quoted('FIRMWARE_COMPONENT_NAME_TPM', get_option('firmware-component-name-tpm'))
 endif
 
+if get_option('firmware-component-name-cx7') != ''
+conf_data.set_quoted('FIRMWARE_COMPONENT_NAME_CX7', get_option('firmware-component-name-cx7'))
+endif
+
+if get_option('firmware-component-name-fpga') != ''
+conf_data.set_quoted('FIRMWARE_COMPONENT_NAME_FPGA', get_option('firmware-component-name-fpga'))
+endif
+
 if get_option('platform-prefix') != ''
 conf_data.set_quoted('PLATFORM_PREFIX', get_option('platform-prefix'))
 endif

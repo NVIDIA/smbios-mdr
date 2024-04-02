@@ -736,21 +736,28 @@ void MDRV2::systemInfoUpdate()
 #endif
 #ifdef FIRMWARE_COMPONENT_NAME_BIOS
         std::string biosComponentName(FIRMWARE_COMPONENT_NAME_BIOS);
-        if (biosComponentName == firmwareName && system != nullptr)
+        if (biosComponentName == firmwareName)
         {
             continue;
         }
 #endif
 #ifdef FIRMWARE_COMPONENT_NAME_CX7
         std::string cx7ComponentName(FIRMWARE_COMPONENT_NAME_CX7);
-        if ((firmwareName.rfind(cx7ComponentName, 0) == 0) && system != nullptr)
+        if (firmwareName.rfind(cx7ComponentName) != std::string::npos)
+        {
+            continue;
+        }
+#endif
+#ifdef FIRMWARE_COMPONENT_NAME_FPGA
+        std::string fpgaComponentName(FIRMWARE_COMPONENT_NAME_FPGA);
+        if (firmwareName.rfind(fpgaComponentName) != std::string::npos)
         {
             continue;
         }
 #endif
 #ifdef FIRMWARE_COMPONENT_NAME_TPM
         std::string tpmComponentName(FIRMWARE_COMPONENT_NAME_TPM);
-        if (tpmComponentName == firmwareName && tpm != nullptr)
+        if (tpmComponentName == firmwareName)
         {
             continue;
         }
