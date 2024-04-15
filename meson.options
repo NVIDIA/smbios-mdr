@@ -20,10 +20,24 @@ option(
 )
 
 option(
+  'assoc-trim-path',
+  type: 'feature',
+  value: 'disabled',
+  description: 'Trim one object path component from CPU and DIMM associations'
+)
+
+option(
   'cpuinfo',
   type: 'feature',
   value: 'enabled',
   description: 'Build CPUInfo service'
+)
+
+option(
+  'cpuinfo-peci',
+  type: 'feature',
+  value: 'enabled',
+  description: 'Enable CPUInfo features that depend on PECI'
 )
 
 option(

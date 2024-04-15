@@ -3,6 +3,10 @@ if get_option('dimm-dbus').allowed()
   cpp_args_smbios += ['-DDIMM_DBUS']
 endif
 
+if get_option('assoc-trim-path').allowed()
+  cpp_args_smbios += ['-DASSOC_TRIM_PATH']
+endif
+
 if get_option('dimm-only-locator').allowed()
   cpp_args_smbios += ['-DDIMM_ONLY_LOCATOR']
 endif
@@ -42,15 +46,21 @@ if get_option('cpuinfo').allowed()
   # i2c-tools provides no pkgconfig so we need to find it manually
   i2c_dep = cpp.find_library('i2c')
 
+  peci_dep = []
+  peci_flag = []
+  peci_files = []
+  if get_option('cpuinfo-peci').allowed()
+    peci_flag = '-DPECI_ENABLED=1'
   peci_dep = dependency('libpeci')
+    peci_files = ['speed_select.cpp', 'sst_mailbox.cpp']
+  endif
 
   executable(
     'cpuinfoapp',
     'cpuinfo_main.cpp',
-    'speed_select.cpp',
-    'sst_mailbox.cpp',
     'cpuinfo_utils.cpp',
-    cpp_args: boost_args,
+    peci_files,
+    cpp_args: boost_args + peci_flag,
     dependencies: [
       boost_dep,
       sdbusplus_dep,

@@ -397,7 +397,7 @@ void MDRV2::systemInfoUpdate()
     // By default, look for System interface on any system/board/* object
     std::string mapperAncestorPath = smbiosInventoryPath;
     std::string matchParentPath = smbiosInventoryPath + "/board/";
-    // bool requireExactMatch = false;
+    bool requireExactMatch = false;
 
     // If customized, look for System on only that custom object
     if (smbiosInventoryPath != defaultInventoryPath)
@@ -407,7 +407,7 @@ void MDRV2::systemInfoUpdate()
         // Search under parent to find exact match for self
         mapperAncestorPath = path.parent_path().string();
         matchParentPath = mapperAncestorPath;
-        // requireExactMatch = true;
+        requireExactMatch = true;
     }
 
     std::string motherboardPath;
@@ -415,7 +415,14 @@ void MDRV2::systemInfoUpdate()
                                       mapperInterface, "GetSubTree");
     method.append(mapperAncestorPath);
     method.append(0);
-    method.append(std::vector<std::string>({systemInterface}));
+
+    // If customized, also accept Board as anchor, not just System
+    std::vector<std::string> desiredInterfaces{systemInterface};
+    if (requireExactMatch)
+    {
+        desiredInterfaces.emplace_back(boardInterface);
+    }
+    method.append(desiredInterfaces);
 
     try
     {
@@ -955,7 +962,10 @@ std::optional<size_t> MDRV2::getTotalNum(uint8_t typeId, size_t minSize)
 
 bool MDRV2::checkSMBIOSVersion(uint8_t* dataIn)
 {
-    std::string buffer(dataIn, dataIn + smbiosTableStorageSize);
+    const std::string anchorString21 = "_SM_";
+    const std::string anchorString30 = "_SM3_";
+    std::string buffer(reinterpret_cast<const char*>(dataIn),
+                       smbiosTableStorageSize);
 
     auto it = std::search(std::begin(buffer), std::end(buffer),
                           std::begin(anchorString21), std::end(anchorString21));

@@ -66,6 +66,8 @@ static constexpr const char* chassisInterface =
     "xyz.openbmc_project.Inventory.Item.Chassis";
 static constexpr const char* versionInterface =
     "xyz.openbmc_project.Software.Version";
+static constexpr const char* boardInterface =
+    "xyz.openbmc_project.Inventory.Item.Board";
 constexpr const int limitEntryLen = 0xff;
 
 // Avoid putting multiple interfaces with same name on same object
@@ -215,7 +217,7 @@ class MDRV2 :
 
     const std::array<uint8_t, 16> smbiosTableId{
         40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 0x42};
-    uint8_t smbiosTableStorage[smbiosTableStorageSize];
+    uint8_t smbiosTableStorage[smbiosTableStorageSize] = {};
 
     bool smbiosIsUpdating(uint8_t index);
     bool smbiosIsAvailForUpdate(uint8_t index);
