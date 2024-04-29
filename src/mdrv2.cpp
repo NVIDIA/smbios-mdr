@@ -536,6 +536,7 @@ void MDRV2::systemInfoUpdate()
 
     std::optional<size_t> num;
 
+#ifdef PROCMOD_DBUS
     int processorModuleIndex = 0;
     baseboards.clear();
     num = getTotalNum(baseboardType);
@@ -563,7 +564,10 @@ void MDRV2::systemInfoUpdate()
                 break;
         }
     }
+#endif
 
+
+#ifdef CPU_DBUS
     cpus.clear();
     num = getTotalCpuSlot();
     if (!num)
@@ -611,6 +615,7 @@ void MDRV2::systemInfoUpdate()
             *bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
             cpuContainerPath));
     }
+#endif
 
 #ifdef DIMM_DBUS
     dimms.clear();

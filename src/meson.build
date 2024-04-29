@@ -11,6 +11,14 @@ if get_option('dimm-only-locator').allowed()
   cpp_args_smbios += ['-DDIMM_ONLY_LOCATOR']
 endif
 
+if get_option('cpu-dbus').allowed()
+  cpp_args_smbios += ['-DCPU_DBUS']
+endif
+
+if get_option('procmod-dbus').allowed()
+  cpp_args_smbios += ['-DPROCMOD_DBUS']
+endif
+
 if get_option('nvidia')
   cpp_args_smbios += ['-DNVIDIA']
 endif

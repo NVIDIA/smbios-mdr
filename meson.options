@@ -20,6 +20,20 @@ option(
 )
 
 option(
+  'cpu-dbus',
+  type: 'feature',
+  value: 'enabled',
+  description: 'Expose CPU D-Bus Interface'
+)
+
+option(
+  'procmod-dbus',
+  type: 'feature',
+  value: 'enabled',
+  description: 'Expose Processor Module D-Bus Interface'
+)
+
+option(
   'assoc-trim-path',
   type: 'feature',
   value: 'disabled',
