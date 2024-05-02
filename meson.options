@@ -102,3 +102,10 @@ option(
   value: '',
   description: 'Platform prefix, it prepend to DBus object name, such as ${PLATFORM_PREFIX}_CPU_0'
 )
+
+option(
+  'copy-cpu-version-to-model',
+  type: 'boolean',
+  value: 'false',
+  description: 'Copy CPU version to model property'
+)

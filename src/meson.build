@@ -19,6 +19,12 @@ if get_option('expose-inventory')
   cpp_args_smbios += ['-DEXPOSE_FW_INVENTORY']
 endif
 
+if get_option('copy-cpu-version-to-model')
+  cpp_args_smbios += ['-DIS_COPY_CPU_VERSION_TO_MODEL=true']
+else
+  cpp_args_smbios += ['-DIS_COPY_CPU_VERSION_TO_MODEL=false']
+endif
+
 executable(
   'smbiosmdrv2app',
   'mdrv2.cpp',

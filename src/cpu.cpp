@@ -114,6 +114,12 @@ void Cpu::version(const uint8_t positionNum, const uint8_t structLen,
     result = positionToString(positionNum, structLen, dataIn);
 
     rev::version(result);
+
+    if (IS_COPY_CPU_VERSION_TO_MODEL == true)
+    {
+        // populate the version to Model property for Redfish
+        asset::model(result);
+    }
 }
 
 void Cpu::characteristics(uint16_t value)
