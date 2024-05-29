@@ -412,7 +412,7 @@ void MDRV2::systemInfoUpdate()
 
     std::string motherboardPath;
     auto method = bus->new_method_call(mapperBusName, mapperPath,
-                                      mapperInterface, "GetSubTree");
+                                       mapperInterface, "GetSubTree");
     method.append(mapperAncestorPath);
     method.append(0);
 
@@ -457,7 +457,6 @@ void MDRV2::systemInfoUpdate()
         }
         if (motherboardPath.empty() && subtree.size() != 0)
         {
-
             motherboardPath = subtree.begin()->first;
         }
     }
@@ -479,8 +478,8 @@ void MDRV2::systemInfoUpdate()
         response;
     sdbusplus::message_t findProcModuleMethod =
         bus->new_method_call("xyz.openbmc_project.ObjectMapper",
-                            "/xyz/openbmc_project/object_mapper",
-                            "xyz.openbmc_project.ObjectMapper", "GetSubTree");
+                             "/xyz/openbmc_project/object_mapper",
+                             "xyz.openbmc_project.ObjectMapper", "GetSubTree");
     findProcModuleMethod.append(
         "/xyz/openbmc_project/inventory", 0,
         std::array<const char*, 1>{
@@ -510,8 +509,8 @@ void MDRV2::systemInfoUpdate()
                     std::variant<uint64_t> instanceNumber;
                     sdbusplus::message_t getInstanceMethod =
                         bus->new_method_call(service.c_str(), path.c_str(),
-                                            "org.freedesktop.DBus.Properties",
-                                            "Get");
+                                             "org.freedesktop.DBus.Properties",
+                                             "Get");
                     getInstanceMethod.append(interface, "InstanceNumber");
                     try
                     {
@@ -565,7 +564,6 @@ void MDRV2::systemInfoUpdate()
         }
     }
 #endif
-
 
 #ifdef CPU_DBUS
     cpus.clear();
@@ -779,8 +777,8 @@ void MDRV2::systemInfoUpdate()
         {
             objName = "firmware" + std::to_string(index);
         }
-        objName =
-            std::regex_replace(objName, std::regex("[^a-zA-Z0-9_/]+"), "_");
+        objName = std::regex_replace(objName, std::regex("[^a-zA-Z0-9_/]+"),
+                                     "_");
 
         // Skip if we have the same object name on DBUS, BIOS probably fetchs it
         // from BMC.
@@ -1041,7 +1039,8 @@ bool MDRV2::checkSMBIOSVersion(uint8_t* dataIn)
 bool MDRV2::agentSynchronizeData()
 {
     struct MDRSMBIOSHeader mdr2SMBIOS;
-    std::fill_n(smbiosDir.dir[smbiosDirIndex].dataStorage, smbiosTableStorageSize, 0);
+    std::fill_n(smbiosDir.dir[smbiosDirIndex].dataStorage,
+                smbiosTableStorageSize, 0);
     bool status = readDataFromFlash(&mdr2SMBIOS,
                                     smbiosDir.dir[smbiosDirIndex].dataStorage);
     if (!status)
@@ -1059,8 +1058,7 @@ bool MDRV2::agentSynchronizeData()
     }
 
     // Defer systemInfoUpdate() to speed up reply
-    std::chrono::microseconds usec(
-        defaultTimeout);
+    std::chrono::microseconds usec(defaultTimeout);
     timer.expires_after(usec);
     timer.async_wait([this](boost::system::error_code ec) {
         if (ec || this == nullptr)

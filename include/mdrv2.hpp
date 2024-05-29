@@ -133,30 +133,30 @@ class MDRV2 :
                 sdbusplus::bus::match::rules::argNpath(
                     0, "/xyz/openbmc_project/inventory/"),
             [&](sdbusplus::message_t& m) {
-                using Interface = std::string;
-                using Property = std::string;
-                using Value =
-                    std::variant<bool, uint8_t, int16_t, uint16_t, int32_t,
-                                 uint32_t, int64_t, uint64_t, double,
-                                 std::string, std::vector<uint8_t>>;
-                using PropertyMap = std::map<Property, Value>;
-                using InterfaceMap = std::map<Interface, PropertyMap>;
-                sdbusplus::message::object_path objPath;
-                InterfaceMap interfaces;
-                m.read(objPath, interfaces);
+            using Interface = std::string;
+            using Property = std::string;
+            using Value =
+                std::variant<bool, uint8_t, int16_t, uint16_t, int32_t,
+                             uint32_t, int64_t, uint64_t, double, std::string,
+                             std::vector<uint8_t>>;
+            using PropertyMap = std::map<Property, Value>;
+            using InterfaceMap = std::map<Interface, PropertyMap>;
+            sdbusplus::message::object_path objPath;
+            InterfaceMap interfaces;
+            m.read(objPath, interfaces);
 
-                // if interface added, the inventory path could be changed
-                std::set<std::string> interestedInterfaces = {
-                    "xyz.openbmc_project.Inventory.Item.ProcessorModule",
-                    "xyz.openbmc_project.Inventory.Item.System"};
-                for (const auto& [intf, properties] : interfaces)
+            // if interface added, the inventory path could be changed
+            std::set<std::string> interestedInterfaces = {
+                "xyz.openbmc_project.Inventory.Item.ProcessorModule",
+                "xyz.openbmc_project.Inventory.Item.System"};
+            for (const auto& [intf, properties] : interfaces)
+            {
+                if (interestedInterfaces.contains(intf))
                 {
-                    if (interestedInterfaces.contains(intf))
-                    {
-                        systemInfoUpdate();
-                    }
+                    systemInfoUpdate();
                 }
-            });
+            }
+        });
 
         smbiosDir.agentVersion = smbiosAgentVersion;
         smbiosDir.dirVersion = smbiosDirVersion;

@@ -16,6 +16,7 @@
 
 #pragma once
 #include "config.h"
+
 #include "smbios_mdrv2.hpp"
 
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
@@ -54,8 +55,8 @@ using processor = sdbusplus::server::xyz::openbmc_project::inventory::item::Cpu;
 using Item = sdbusplus::server::xyz::openbmc_project::inventory::Item;
 using association =
     sdbusplus::server::xyz::openbmc_project::association::Definitions;
-using operationalStatus = 
-    sdbusplus::xyz::openbmc_project::State::Decorator::server::OperationalStatus;
+using operationalStatus = sdbusplus::xyz::openbmc_project::State::Decorator::
+    server::OperationalStatus;
 using instance =
     sdbusplus::server::xyz::openbmc_project::inventory::decorator::Instance;
 
@@ -335,7 +336,8 @@ class Cpu :
         uint8_t* smbiosTableStorage, const std::string& motherboard) :
         sdbusplus::server::object_t<processor, asset, assetTagType, location,
                                     connector, rev, Item, association, instance,
-                                    chassis, operationalStatus>(bus, objPath.c_str()),
+                                    chassis, operationalStatus>(
+            bus, objPath.c_str()),
         cpuNum(cpuId), storage(smbiosTableStorage), motherboardPath(motherboard)
     {
         infoUpdate(smbiosTableStorage, motherboard);
@@ -344,7 +346,8 @@ class Cpu :
     void infoUpdate(uint8_t* smbiosTableStorage,
                     const std::string& motherboard);
 
-    static inline auto socketChipNumber([[maybe_unused]]const std::string socketDesignation)
+    static inline auto
+        socketChipNumber([[maybe_unused]] const std::string socketDesignation)
     {
         bool found = false;
         size_t socket = 0;

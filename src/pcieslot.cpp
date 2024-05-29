@@ -45,13 +45,13 @@ void Pcie::pcieInfoUpdate(uint8_t* smbiosTableStorage,
     auto pcieInfo = reinterpret_cast<struct SystemSlotInfo*>(dataIn);
 
     uint8_t slotHight = slotHeightNotApplicable;
-    // check if the data inside the valid length, some data might not exist in older SMBIOS version
-    auto isValid = [pcieInfo](void* varAddr, size_t length = 1){
+    // check if the data inside the valid length, some data might not exist in
+    // older SMBIOS version
+    auto isValid = [pcieInfo](void* varAddr, size_t length = 1) {
         char* base = reinterpret_cast<char*>(pcieInfo);
         char* data = reinterpret_cast<char*>(varAddr);
         size_t offset = data - base;
-        if ((data >= base) &&
-            (offset + length - 1) < pcieInfo->length)
+        if ((data >= base) && (offset + length - 1) < pcieInfo->length)
         {
             return true;
         }
@@ -59,7 +59,9 @@ void Pcie::pcieInfoUpdate(uint8_t* smbiosTableStorage,
     };
     if (isValid(&pcieInfo->peerGorupingCount))
     {
-        auto pcieInfoAfterPeerGroups = reinterpret_cast<struct SystemSlotInfoAfterPeerGroups*>(&(pcieInfo->peerGroups[pcieInfo->peerGorupingCount]));
+        auto pcieInfoAfterPeerGroups =
+            reinterpret_cast<struct SystemSlotInfoAfterPeerGroups*>(
+                &(pcieInfo->peerGroups[pcieInfo->peerGorupingCount]));
         if (isValid(&pcieInfoAfterPeerGroups->slotHeight))
         {
             slotHight = pcieInfoAfterPeerGroups->slotHeight;
@@ -97,7 +99,8 @@ void Pcie::pcieGeneration(const uint8_t type)
     }
 }
 
-void Pcie::pcieType(const uint8_t type, const uint8_t length, const uint8_t height)
+void Pcie::pcieType(const uint8_t type, const uint8_t length,
+                    const uint8_t height)
 {
     PCIeType dbusPcieType = PCIeType::Unknown;
     std::map<uint8_t, PCIeType>::const_iterator it = pcieTypeTable.find(type);

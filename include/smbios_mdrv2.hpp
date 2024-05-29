@@ -16,6 +16,7 @@
 
 #pragma once
 #include "config.h"
+
 #include <phosphor-logging/elog-errors.hpp>
 
 #include <array>

@@ -103,7 +103,8 @@ class Pcie :
     } __attribute__((packed));
 
     void pcieGeneration(const uint8_t type);
-    void pcieType(const uint8_t type, const uint8_t length, const uint8_t height);
+    void pcieType(const uint8_t type, const uint8_t length,
+                  const uint8_t height);
     void pcieLaneSize(const uint8_t width);
     void pcieIsHotPluggable(const uint8_t characteristics);
     void pcieLocation(const uint8_t slotDesignation, const uint8_t structLen,

@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,7 +51,8 @@ class Firmware : associationIntf, assetIntf, itemIntf
     Firmware(Firmware&&) = default;
     Firmware& operator=(Firmware&&) = default;
 
-    Firmware(std::shared_ptr<sdbusplus::asio::connection> bus, const std::string& objPath, int index,
+    Firmware(std::shared_ptr<sdbusplus::asio::connection> bus,
+             const std::string& objPath, int index,
              uint8_t* smbiosTableStorage) :
         associationIntf(*bus, objPath.c_str()),
         assetIntf(*bus, objPath.c_str()), itemIntf(*bus, objPath.c_str()),

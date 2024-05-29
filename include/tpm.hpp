@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,10 +47,10 @@ class Tpm : tpmIntf, assetIntf, itemIntf, softwareversionIntf
     Tpm(Tpm&&) = default;
     Tpm& operator=(Tpm&&) = default;
 
-    Tpm(std::shared_ptr<sdbusplus::asio::connection> bus, const std::string& objPath,
-        uint8_t* smbiosTableStorage) :
-        tpmIntf(*bus, objPath.c_str()),
-        assetIntf(*bus, objPath.c_str()), itemIntf(*bus, objPath.c_str()),
+    Tpm(std::shared_ptr<sdbusplus::asio::connection> bus,
+        const std::string& objPath, uint8_t* smbiosTableStorage) :
+        tpmIntf(*bus, objPath.c_str()), assetIntf(*bus, objPath.c_str()),
+        itemIntf(*bus, objPath.c_str()),
         softwareversionIntf(*bus, objPath.c_str()), path(objPath),
         storage(smbiosTableStorage)
     {
