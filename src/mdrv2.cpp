@@ -679,6 +679,13 @@ void MDRV2::systemInfoUpdate()
     {
         std::string path = smbiosInventoryPath + pcieSuffix +
                            std::to_string(index);
+        // PCIeSlots need to start with same inventory path as the system path 
+        if (!motherboardPath.empty() &&
+            path.starts_with(defaultMotherboardPath))
+        {
+            path.replace(0, strlen(defaultMotherboardPath), motherboardPath);
+        }
+
         if (index + 1 > pcies.size())
         {
             pcies.emplace_back(std::make_unique<phosphor::smbios::Pcie>(
