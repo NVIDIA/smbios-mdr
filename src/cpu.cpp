@@ -186,9 +186,6 @@ void Cpu::infoUpdate(uint8_t* smbiosTableStorage,
     }
     present(true);
 
-    // the default value is unknown, set to Component when CPU exists
-    chassis::type(Chassis::ChassisType::Component);
-
     if ((cpuInfo->status & statusMask) == 1)
     {
         functional(true);
@@ -280,7 +277,9 @@ void Cpu::infoUpdate(uint8_t* smbiosTableStorage,
     {
         std::vector<std::tuple<std::string, std::string, std::string>> assocs;
         assocs.emplace_back("processors", "all_processors", objPath);
-        assocs.emplace_back("parent_chassis", "all_chassis", motherboardPath);
+#ifndef PLATFORM_PREFIX
+            assocs.emplace_back("parent_chassis", "all_chassis", motherboardPath);
+#endif
         association::associations(assocs);
     }
 }

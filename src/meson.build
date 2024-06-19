@@ -38,6 +38,7 @@ executable(
   'mdrv2.cpp',
   'mdrv2_main.cpp',
   'cpu.cpp',
+  'chassisCpu.cpp',
   'dimm.cpp',
   'system.cpp',
   'pcieslot.cpp',

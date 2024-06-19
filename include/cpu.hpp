@@ -19,6 +19,10 @@
 
 #include "smbios_mdrv2.hpp"
 
+#ifdef PLATFORM_PREFIX
+#include "chassisCpu.hpp"
+#endif
+
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Connector/Slot/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
@@ -322,7 +326,7 @@ static const std::array<std::optional<processor::Capability>, 16>
 class Cpu :
     sdbusplus::server::object_t<processor, asset, assetTagType, location,
                                 connector, rev, Item, association, instance,
-                                chassis, operationalStatus>
+                                operationalStatus>
 {
   public:
     Cpu() = delete;
@@ -332,14 +336,26 @@ class Cpu :
     Cpu& operator=(Cpu&&) = delete;
     ~Cpu() = default;
 
-    Cpu(sdbusplus::bus_t& bus, const std::string& objPath, const uint8_t& cpuId,
-        uint8_t* smbiosTableStorage, const std::string& motherboard) :
+    Cpu(sdbusplus::bus_t& bus, const std::string& path, const uint8_t& cpuId,
+        uint8_t* smbiosTableStorage, const std::string& motherboard,
+        std::string& assocPath) :
         sdbusplus::server::object_t<processor, asset, assetTagType, location,
                                     connector, rev, Item, association, instance,
-                                    chassis, operationalStatus>(
-            bus, objPath.c_str()),
-        cpuNum(cpuId), storage(smbiosTableStorage), motherboardPath(motherboard)
+                                    operationalStatus>(bus, path.c_str()),
+        cpuNum(cpuId), storage(smbiosTableStorage),
+        motherboardPath(motherboard), objPath(assocPath)
     {
+#ifndef PLATFORM_PREFIX
+        chassisIface = std::make_unique<chassis>(bus, path.c_str());
+        // the default value is unknown, set to Component when CPU exists
+        chassisIface->type(chassis::ChassisType::Component);
+        chassisIface->emit_added();
+#else
+        static std::vector<std::unique_ptr<chassisCpu>> chassisCpus;
+
+        chassisCpus.emplace_back(std::make_unique<phosphor::smbios::chassisCpu>(
+            bus, assocPath, cpuId, smbiosTableStorage, motherboard, path));
+#endif
         infoUpdate(smbiosTableStorage, motherboard);
     }
 
@@ -398,6 +414,10 @@ class Cpu :
     std::string motherboardPath;
 
     std::string objPath;
+
+#ifndef PLATFORM_PREFIX
+    std::unique_ptr<chassis> chassisIface = nullptr;
+#endif
 
     struct ProcessorInfo
     {
