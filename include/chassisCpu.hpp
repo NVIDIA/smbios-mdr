@@ -123,6 +123,8 @@ class chassisCpu :
         uint16_t threadCount2;
     } __attribute__((packed));
 
+    void locationString(const uint8_t positionNum, const uint8_t structLen,
+                 uint8_t* dataIn);
     void manufacturer(const uint8_t positionNum, const uint8_t structLen,
                       uint8_t* dataIn);
     void serialNumber(const uint8_t positionNum, const uint8_t structLen,

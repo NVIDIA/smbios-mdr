@@ -26,6 +26,14 @@ namespace phosphor
 namespace smbios
 {
 
+void chassisCpu::locationString(const uint8_t positionNum, const uint8_t structLen,
+                 uint8_t* dataIn)
+{
+    std::string result = positionToString(positionNum, structLen, dataIn);
+
+    location::locationCode(result);
+}
+
 void chassisCpu::manufacturer(const uint8_t positionNum, const uint8_t structLen,
                        uint8_t* dataIn)
 {
@@ -105,6 +113,8 @@ void chassisCpu::infoUpdate(uint8_t* smbiosTableStorage,
 
     // the default value is unknown, set to Component when CPU exists
     chassis::type(Chassis::ChassisType::Component);
+
+    locationString(cpuInfo->socketDesignation, cpuInfo->length, dataIn); // offset 4h
 
     constexpr uint32_t socketPopulatedMask = 1 << 6;
     constexpr uint32_t statusMask = 0x07;
