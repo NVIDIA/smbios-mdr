@@ -59,8 +59,8 @@ std::vector<uint8_t> MDRV2::getDirectoryInformation(uint8_t dirIndex)
     }
     else
     {
-        responseDir.push_back(smbiosDir.dirEntries - dirIndex -
-                              returnedEntries);
+        responseDir.push_back(
+            smbiosDir.dirEntries - dirIndex - returnedEntries);
     }
     for (uint8_t index = dirIndex; index < smbiosDir.dirEntries; index++)
     {
@@ -254,10 +254,9 @@ bool MDRV2::readDataFromFlash(MDRSMBIOSHeader* mdrHdr, uint8_t* data)
     return true;
 }
 
-bool MDRV2::sendDirectoryInformation(uint8_t dirVersion, uint8_t dirIndex,
-                                     uint8_t returnedEntries,
-                                     uint8_t remainingEntries,
-                                     std::vector<uint8_t> dirEntry)
+bool MDRV2::sendDirectoryInformation(
+    uint8_t dirVersion, uint8_t dirIndex, uint8_t returnedEntries,
+    uint8_t remainingEntries, std::vector<uint8_t> dirEntry)
 {
     bool terminate = false;
     if ((dirIndex >= maxDirEntries) || (returnedEntries < 1))
@@ -676,8 +675,8 @@ void MDRV2::systemInfoUpdate()
 
     for (unsigned int index = 0; index < *num; index++)
     {
-        std::string path = smbiosInventoryPath + pcieSuffix +
-                           std::to_string(index);
+        std::string path =
+            smbiosInventoryPath + pcieSuffix + std::to_string(index);
         // PCIeSlots need to start with same inventory path as the system path
         if (!motherboardPath.empty() &&
             path.starts_with(defaultMotherboardPath))
@@ -783,8 +782,8 @@ void MDRV2::systemInfoUpdate()
         {
             objName = "firmware" + std::to_string(index);
         }
-        objName = std::regex_replace(objName, std::regex("[^a-zA-Z0-9_/]+"),
-                                     "_");
+        objName =
+            std::regex_replace(objName, std::regex("[^a-zA-Z0-9_/]+"), "_");
 
         // Skip if we have the same object name on DBUS, BIOS probably fetchs it
         // from BMC.
@@ -1029,12 +1028,12 @@ bool MDRV2::checkSMBIOSVersion(uint8_t* dataIn)
     lg2::info("SMBIOS VERSION - {MAJOR}.{MINOR}", "MAJOR", foundMajorVersion,
               "MINOR", foundMinorVersion);
 
-    auto itr = std::find_if(std::begin(supportedSMBIOSVersions),
-                            std::end(supportedSMBIOSVersions),
-                            [&](SMBIOSVersion versionItr) {
-        return versionItr.majorVersion == foundMajorVersion &&
-               versionItr.minorVersion == foundMinorVersion;
-    });
+    auto itr = std::find_if(
+        std::begin(supportedSMBIOSVersions), std::end(supportedSMBIOSVersions),
+        [&](SMBIOSVersion versionItr) {
+            return versionItr.majorVersion == foundMajorVersion &&
+                   versionItr.minorVersion == foundMinorVersion;
+        });
     if (itr == std::end(supportedSMBIOSVersions))
     {
         return false;
@@ -1085,8 +1084,8 @@ bool MDRV2::agentSynchronizeData()
     return true;
 }
 
-std::vector<uint32_t> MDRV2::synchronizeDirectoryCommonData(uint8_t idIndex,
-                                                            uint32_t size)
+std::vector<uint32_t>
+    MDRV2::synchronizeDirectoryCommonData(uint8_t idIndex, uint32_t size)
 {
     std::chrono::microseconds usec(
         defaultTimeout); // default lock time out is 2s
@@ -1124,8 +1123,8 @@ std::vector<boost::container::flat_map<std::string, RecordVariant>>
 
         do
         {
-            dataIn = getSMBIOSTypePtr(dataIn, memoryDeviceType,
-                                      sizeof(MemoryInfo));
+            dataIn =
+                getSMBIOSTypePtr(dataIn, memoryDeviceType, sizeof(MemoryInfo));
             if (dataIn == nullptr)
             {
                 break;
