@@ -52,9 +52,8 @@ using operationalStatus = sdbusplus::xyz::openbmc_project::State::Decorator::
     server::OperationalStatus;
 
 class chassisCpu :
-    sdbusplus::server::object_t<asset, assetTagType, location, chassis,
-                                Item, association,
-                                operationalStatus>
+    sdbusplus::server::object_t<asset, assetTagType, location, chassis, Item,
+                                association, operationalStatus>
 {
   public:
     chassisCpu() = delete;
@@ -66,7 +65,7 @@ class chassisCpu :
     chassisCpu(sdbusplus::bus_t& bus, const std::string& objPath,
                const uint8_t& cpuId, uint8_t* smbiosTableStorage,
                const std::string& motherboard, const std::string& assocPath) :
-        sdbusplus::server::object_t<asset, assetTagType, location, chassis, 
+        sdbusplus::server::object_t<asset, assetTagType, location, chassis,
                                     Item, association, operationalStatus>(
             bus, objPath.c_str()),
         cpuNum(cpuId), storage(smbiosTableStorage),
@@ -124,7 +123,7 @@ class chassisCpu :
     } __attribute__((packed));
 
     void locationString(const uint8_t positionNum, const uint8_t structLen,
-                 uint8_t* dataIn);
+                        uint8_t* dataIn);
     void manufacturer(const uint8_t positionNum, const uint8_t structLen,
                       uint8_t* dataIn);
     void serialNumber(const uint8_t positionNum, const uint8_t structLen,
@@ -134,7 +133,7 @@ class chassisCpu :
     void partNumber(const uint8_t positionNum, const uint8_t structLen,
                     uint8_t* dataIn);
     void model(const uint8_t positionNum, const uint8_t structLen,
-                 uint8_t* dataIn);
+               uint8_t* dataIn);
 };
 
 } // namespace smbios

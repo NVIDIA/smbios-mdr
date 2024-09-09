@@ -16,6 +16,7 @@
  */
 
 #include "chassisCpu.hpp"
+
 #include "cpu.hpp"
 
 #include <bitset>
@@ -26,16 +27,16 @@ namespace phosphor
 namespace smbios
 {
 
-void chassisCpu::locationString(const uint8_t positionNum, const uint8_t structLen,
-                 uint8_t* dataIn)
+void chassisCpu::locationString(const uint8_t positionNum,
+                                const uint8_t structLen, uint8_t* dataIn)
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
     location::locationCode(result);
 }
 
-void chassisCpu::manufacturer(const uint8_t positionNum, const uint8_t structLen,
-                       uint8_t* dataIn)
+void chassisCpu::manufacturer(const uint8_t positionNum,
+                              const uint8_t structLen, uint8_t* dataIn)
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
@@ -67,12 +68,11 @@ void chassisCpu::assetTagString(const uint8_t positionNum,
 }
 
 void chassisCpu::model(const uint8_t positionNum, const uint8_t structLen,
-                         uint8_t* dataIn)
+                       uint8_t* dataIn)
 {
     std::string result;
 
     result = positionToString(positionNum, structLen, dataIn);
-
 
     if (IS_COPY_CPU_VERSION_TO_MODEL == true)
     {
@@ -114,7 +114,8 @@ void chassisCpu::infoUpdate(uint8_t* smbiosTableStorage,
     // the default value is unknown, set to Component when CPU exists
     chassis::type(Chassis::ChassisType::Component);
 
-    locationString(cpuInfo->socketDesignation, cpuInfo->length, dataIn); // offset 4h
+    locationString(cpuInfo->socketDesignation, cpuInfo->length,
+                   dataIn); // offset 4h
 
     constexpr uint32_t socketPopulatedMask = 1 << 6;
     constexpr uint32_t statusMask = 0x07;
@@ -137,15 +138,15 @@ void chassisCpu::infoUpdate(uint8_t* smbiosTableStorage,
     }
 
     manufacturer(cpuInfo->manufacturer, cpuInfo->length,
-                 dataIn);                      // offset 7h
+                 dataIn);                             // offset 7h
 
     model(cpuInfo->version, cpuInfo->length, dataIn); // offset 10h
     serialNumber(cpuInfo->serialNum, cpuInfo->length,
-                 dataIn);                               // offset 20h
+                 dataIn);                             // offset 20h
     assetTagString(cpuInfo->assetTag, cpuInfo->length,
-                   dataIn);                             // offset 21h
+                   dataIn);                           // offset 21h
     partNumber(cpuInfo->partNum, cpuInfo->length,
-               dataIn);                                 // offset 22h
+               dataIn);                               // offset 22h
 
     if (!motherboardPath.empty())
     {

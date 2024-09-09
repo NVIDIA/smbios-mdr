@@ -278,7 +278,7 @@ void Cpu::infoUpdate(uint8_t* smbiosTableStorage,
         std::vector<std::tuple<std::string, std::string, std::string>> assocs;
         assocs.emplace_back("processors", "all_processors", objPath);
 #ifndef PLATFORM_PREFIX
-            assocs.emplace_back("parent_chassis", "all_chassis", motherboardPath);
+        assocs.emplace_back("parent_chassis", "all_chassis", motherboardPath);
 #endif
         association::associations(assocs);
     }

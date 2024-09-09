@@ -49,8 +49,8 @@ class Tpm : tpmIntf, assetIntf, itemIntf, softwareversionIntf
 
     Tpm(std::shared_ptr<sdbusplus::asio::connection> bus,
         const std::string& objPath, uint8_t* smbiosTableStorage) :
-        tpmIntf(*bus, objPath.c_str()), assetIntf(*bus, objPath.c_str()),
-        itemIntf(*bus, objPath.c_str()),
+        tpmIntf(*bus, objPath.c_str()),
+        assetIntf(*bus, objPath.c_str()), itemIntf(*bus, objPath.c_str()),
         softwareversionIntf(*bus, objPath.c_str()), path(objPath),
         storage(smbiosTableStorage)
     {

@@ -297,7 +297,8 @@ static void
                 "Cannot set CPU property!");
             return;
         }
-    }, cpuProcessName, newProp.object.c_str(),
+    },
+        cpuProcessName, newProp.object.c_str(),
         "org.freedesktop.DBus.Properties", "Set", newProp.interface,
         newProp.name, std::variant<std::string>{newProp.value});
 }
