@@ -653,7 +653,6 @@ void MDRV2::systemInfoUpdate()
 
         std::string path(defaultMotherboardPath);
         path += "/" + objName;
-        path = decorateName(path);
         dimms.emplace_back(std::make_unique<phosphor::smbios::Dimm>(
             *bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
             motherboardPath));
