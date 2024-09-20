@@ -212,7 +212,9 @@ void Dimm::dimmDeviceLocator(const uint8_t bankLocatorPositionNum,
 
     memoryDeviceLocator(result);
 
+#ifdef DIMM_LOCATION_CODE
     locationCode(result);
+#endif
     const std::string substrCpu = "CPU";
     auto cpuPos = deviceLocator.find(substrCpu);
 
@@ -381,11 +383,13 @@ std::string Dimm::partNumber(std::string value)
         Asset::partNumber(value);
 }
 
+#ifdef DIMM_LOCATION_CODE
 std::string Dimm::locationCode(std::string value)
 {
     return sdbusplus::server::xyz::openbmc_project::inventory::decorator::
         LocationCode::locationCode(value);
 }
+#endif
 
 size_t Dimm::memoryAttributes(size_t value)
 {

@@ -48,8 +48,10 @@ class Dimm :
                                     inventory::item::dimm::MemoryLocation>,
     sdbusplus::server::object_t<
         sdbusplus::server::xyz::openbmc_project::inventory::decorator::Asset>,
+#ifdef DIMM_LOCATION_CODE
     sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
                                     inventory::decorator::LocationCode>,
+#endif
     sdbusplus::server::object_t<
         sdbusplus::server::xyz::openbmc_project::inventory::connector::Slot>,
     sdbusplus::server::object_t<
@@ -80,9 +82,11 @@ class Dimm :
         sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
                                         inventory::decorator::Asset>(
             bus, objPath.c_str()),
+#ifdef DIMM_LOCATION_CODE
         sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
                                         inventory::decorator::LocationCode>(
             bus, objPath.c_str()),
+#endif
         sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
                                         inventory::connector::Slot>(
             bus, objPath.c_str()),
@@ -114,7 +118,9 @@ class Dimm :
     bool present(bool value) override;
     std::string serialNumber(std::string value) override;
     std::string partNumber(std::string value) override;
+#ifdef DIMM_LOCATION_CODE
     std::string locationCode(std::string value) override;
+#endif
     size_t memoryAttributes(size_t value) override;
     MemoryTechType memoryMedia(MemoryTechType value) override;
     uint8_t slot(uint8_t value) override;

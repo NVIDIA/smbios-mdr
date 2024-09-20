@@ -20,6 +20,13 @@ option(
 )
 
 option(
+  'dimm-location-code',
+  type: 'feature',
+  value: 'enabled',
+  description: 'Expose DIMM LocationCode D-Bus interface and enable related features'
+)
+
+option(
   'cpu-dbus',
   type: 'feature',
   value: 'enabled',

@@ -11,6 +11,10 @@ if get_option('dimm-only-locator').allowed()
   cpp_args_smbios += ['-DDIMM_ONLY_LOCATOR']
 endif
 
+if get_option('dimm-location-code').allowed()
+  cpp_args_smbios += ['-DDIMM_LOCATION_CODE']
+endif
+
 if get_option('cpu-dbus').allowed()
   cpp_args_smbios += ['-DCPU_DBUS']
 endif
