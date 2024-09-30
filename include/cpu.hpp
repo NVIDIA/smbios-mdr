@@ -353,6 +353,11 @@ class Cpu :
 #else
         static std::vector<std::unique_ptr<chassisCpu>> chassisCpus;
 
+        if (!chassisCpus.empty() && (cpuId == 0))
+        {
+            chassisCpus.clear();
+        }
+
         chassisCpus.emplace_back(std::make_unique<phosphor::smbios::chassisCpu>(
             bus, assocPath, cpuId, smbiosTableStorage, motherboard, path));
 #endif
