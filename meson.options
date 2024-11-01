@@ -34,6 +34,13 @@ option(
 )
 
 option(
+  'cpu-dbus-chassisiface',
+  type: 'feature',
+  value: 'enabled',
+  description: 'Add Chassis Interface into CPU D-Bus'
+)
+
+option(
   'procmod-dbus',
   type: 'feature',
   value: 'enabled',
