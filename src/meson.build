@@ -19,6 +19,9 @@ if get_option('cpu-dbus').allowed()
   cpp_args_smbios += ['-DCPU_DBUS']
 endif
 
+if get_option('cpu-dbus-chassisiface').allowed()
+  cpp_args_smbios += ['-DCPU_DBUS_CHASSISIFACE']
+endif
 if get_option('procmod-dbus').allowed()
   cpp_args_smbios += ['-DPROCMOD_DBUS']
 endif

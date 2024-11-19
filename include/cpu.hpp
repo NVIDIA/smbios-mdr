@@ -346,10 +346,12 @@ class Cpu :
         motherboardPath(motherboard), objPath(assocPath)
     {
 #ifndef PLATFORM_PREFIX
+#ifdef CPU_DBUS_CHASSISIFACE
         chassisIface = std::make_unique<chassis>(bus, path.c_str());
         // the default value is unknown, set to Component when CPU exists
         chassisIface->type(chassis::ChassisType::Component);
         chassisIface->emit_added();
+#endif
 #else
         static std::vector<std::unique_ptr<chassisCpu>> chassisCpus;
 
