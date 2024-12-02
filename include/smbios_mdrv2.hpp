@@ -213,9 +213,10 @@ inline std::string decorateName(const std::string& path)
 #endif
 }
 
-constexpr std::array<SMBIOSVersion, 5> supportedSMBIOSVersions{
+constexpr std::array<SMBIOSVersion, 8> supportedSMBIOSVersions{
     SMBIOSVersion{3, 0}, SMBIOSVersion{3, 2}, SMBIOSVersion{3, 3},
-    SMBIOSVersion{3, 5}, SMBIOSVersion{3, 6}};
+    SMBIOSVersion{3, 4}, SMBIOSVersion{3, 5}, SMBIOSVersion{3, 6},
+    SMBIOSVersion{3, 7}, SMBIOSVersion{3, 8}};
 
 typedef enum
 {
