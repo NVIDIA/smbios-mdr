@@ -93,6 +93,7 @@ void Dimm::memoryInfoUpdate(uint8_t* smbiosTableStorage,
     dimmType(memoryInfo->memoryType);
     dimmTypeDetail(memoryInfo->typeDetail);
     maxMemorySpeedInMhz(memoryInfo->speed);
+    updateFormFactor(memoryInfo->formFactor);
     dimmManufacturer(memoryInfo->manufacturer, memoryInfo->length, dataIn);
     dimmSerialNum(memoryInfo->serialNum, memoryInfo->length, dataIn);
     dimmPartNum(memoryInfo->partNum, memoryInfo->length, dataIn);
@@ -110,6 +111,26 @@ void Dimm::memoryInfoUpdate(uint8_t* smbiosTableStorage,
     }
 
     return;
+}
+
+void Dimm::updateFormFactor(const uint8_t formFactorKey)
+{
+    std::map<uint8_t, FormFactor>::const_iterator it =
+        dimmFormFactorMap.find(formFactorKey);
+    if (it == dimmFormFactorMap.end())
+    {
+        formFactor(FormFactor::RDIMM);
+    }
+    else
+    {
+        formFactor(it->second);
+    }
+}
+
+FormFactor Dimm::formFactor(FormFactor value)
+{
+    return sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::
+        formFactor(value);
 }
 
 void Dimm::updateEccType(uint16_t exPhyArrayHandle)
