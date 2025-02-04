@@ -41,6 +41,9 @@ using EccType =
 using MemoryTechType =
     sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::MemoryTech;
 
+using FormFactor =
+    sdbusplus::common::xyz::openbmc_project::inventory::item::Dimm::FormFactor;
+
 class Dimm :
     sdbusplus::server::object_t<
         sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm>,
@@ -114,6 +117,7 @@ class Dimm :
     DeviceType memoryType(DeviceType value) override;
     std::string memoryTypeDetail(std::string value) override;
     uint16_t maxMemorySpeedInMhz(uint16_t value) override;
+    FormFactor formFactor(FormFactor value) override;
     std::string manufacturer(std::string value) override;
     bool present(bool value) override;
     std::string serialNumber(std::string value) override;
@@ -151,6 +155,7 @@ class Dimm :
     void dimmPartNum(const uint8_t positionNum, const uint8_t structLen,
                      uint8_t* dataIn);
     void updateEccType(uint16_t exPhyArrayHandle);
+    void updateFormFactor(const uint8_t formFactorKey);
 };
 
 struct MemoryInfo
@@ -256,6 +261,8 @@ const std::map<uint8_t, MemoryTechType> dimmMemoryTechTypeMap = {
     {0x5, MemoryTechType::NVDIMM_F},   {0x6, MemoryTechType::NVDIMM_P},
     {0x7, MemoryTechType::IntelOptane}};
 
+const std::map<uint8_t, FormFactor> dimmFormFactorMap = {
+    {0x10, FormFactor::Die}};
 } // namespace smbios
 
 } // namespace phosphor
