@@ -657,9 +657,9 @@ void MDRV2::systemInfoUpdate()
             *bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
             motherboardPath));
     }
-
 #endif
 
+    pcies.clear();
     num = getTotalPcieSlot();
     if (!num)
     {
