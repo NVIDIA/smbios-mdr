@@ -757,9 +757,9 @@ void MDRV2::systemInfoUpdate()
             continue;
         }
 #endif
-#ifdef FIRMWARE_COMPONENT_NAME_CX7
-        std::string cx7ComponentName(FIRMWARE_COMPONENT_NAME_CX7);
-        if (firmwareName.rfind(cx7ComponentName) != std::string::npos)
+#ifdef FIRMWARE_COMPONENT_NAME_NIC
+        std::string nicComponentName(FIRMWARE_COMPONENT_NAME_NIC);
+        if (firmwareName.rfind(nicComponentName) != std::string::npos)
         {
             continue;
         }
