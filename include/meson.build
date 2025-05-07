@@ -17,10 +17,6 @@ if get_option('firmware-component-name-nic') != ''
 conf_data.set_quoted('FIRMWARE_COMPONENT_NAME_NIC', get_option('firmware-component-name-nic'))
 endif
 
-if get_option('firmware-component-name-cx7') != ''
-conf_data.set_quoted('FIRMWARE_COMPONENT_NAME_CX7', get_option('firmware-component-name-cx7'))
-endif
-
 if get_option('firmware-component-name-fpga') != ''
 conf_data.set_quoted('FIRMWARE_COMPONENT_NAME_FPGA', get_option('firmware-component-name-fpga'))
 endif
