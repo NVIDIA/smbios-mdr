@@ -118,13 +118,6 @@ option(
 )
 
 option(
-  'firmware-component-name-cx7',
-  type: 'string',
-  value: '',
-  description: 'CX7 firmware component name in Type 45, it is used to avoid duplicated version object'
-)
-
-option(
   'firmware-component-name-fpga',
   type: 'string',
   value: '',
