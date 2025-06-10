@@ -111,10 +111,10 @@ option(
 )
 
 option(
-  'firmware-component-name-cx7',
+  'firmware-component-name-nic',
   type: 'string',
   value: '',
-  description: 'CX7 firmware component name in Type 45, it is used to avoid duplicated version object'
+  description: 'NIC firmware component name in Type 45, it is used to avoid duplicated version object'
 )
 
 option(

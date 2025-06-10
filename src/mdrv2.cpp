@@ -656,9 +656,9 @@ void MDRV2::systemInfoUpdate()
             *bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
             motherboardPath));
     }
-
 #endif
 
+    pcies.clear();
     num = getTotalPcieSlot();
     if (!num)
     {
@@ -756,9 +756,9 @@ void MDRV2::systemInfoUpdate()
             continue;
         }
 #endif
-#ifdef FIRMWARE_COMPONENT_NAME_CX7
-        std::string cx7ComponentName(FIRMWARE_COMPONENT_NAME_CX7);
-        if (firmwareName.rfind(cx7ComponentName) != std::string::npos)
+#ifdef FIRMWARE_COMPONENT_NAME_NIC
+        std::string nicComponentName(FIRMWARE_COMPONENT_NAME_NIC);
+        if (firmwareName.rfind(nicComponentName) != std::string::npos)
         {
             continue;
         }

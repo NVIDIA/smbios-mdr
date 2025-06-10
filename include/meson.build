@@ -13,8 +13,8 @@ if get_option('firmware-component-name-tpm') != ''
 conf_data.set_quoted('FIRMWARE_COMPONENT_NAME_TPM', get_option('firmware-component-name-tpm'))
 endif
 
-if get_option('firmware-component-name-cx7') != ''
-conf_data.set_quoted('FIRMWARE_COMPONENT_NAME_CX7', get_option('firmware-component-name-cx7'))
+if get_option('firmware-component-name-nic') != ''
+conf_data.set_quoted('FIRMWARE_COMPONENT_NAME_NIC', get_option('firmware-component-name-nic'))
 endif
 
 if get_option('firmware-component-name-fpga') != ''

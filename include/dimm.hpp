@@ -43,6 +43,8 @@ using MemoryTechType =
     sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::MemoryTech;
 
 using Json = nlohmann::json;
+using FormFactor =
+    sdbusplus::common::xyz::openbmc_project::inventory::item::Dimm::FormFactor;
 
 class Dimm :
     sdbusplus::server::object_t<
@@ -117,6 +119,7 @@ class Dimm :
     DeviceType memoryType(DeviceType value) override;
     std::string memoryTypeDetail(std::string value) override;
     uint16_t maxMemorySpeedInMhz(uint16_t value) override;
+    FormFactor formFactor(FormFactor value) override;
     std::string manufacturer(std::string value) override;
     bool present(bool value) override;
     std::string serialNumber(std::string value) override;
@@ -157,6 +160,7 @@ class Dimm :
     void dimmPartNum(const uint8_t positionNum, const uint8_t structLen,
                      uint8_t* dataIn);
     void updateEccType(uint16_t exPhyArrayHandle);
+    void updateFormFactor(const uint8_t formFactorKey);
 };
 
 struct MemoryInfo
@@ -270,6 +274,8 @@ struct memoryLocation
     uint8_t channel;
 };
 
+const std::map<uint8_t, FormFactor> dimmFormFactorMap = {
+    {0x10, FormFactor::Die}};
 } // namespace smbios
 
 } // namespace phosphor
