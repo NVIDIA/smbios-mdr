@@ -30,8 +30,8 @@ namespace smbios
 void Firmware::firmwareInfoUpdate(void)
 {
     uint8_t* dataIn = storage;
-    dataIn = getSMBIOSTypeIndexPtr(dataIn, firmwareInventoryInformationType,
-                                   index);
+    dataIn =
+        getSMBIOSTypeIndexPtr(dataIn, firmwareInventoryInformationType, index);
     if (dataIn == nullptr)
     {
         return;
@@ -59,8 +59,8 @@ void Firmware::firmwareInfoUpdate(void)
     associationIntf::associations(association);
 }
 
-std::tuple<std::string, std::string> Firmware::getFirmwareName(uint8_t* dataIn,
-                                                               int targetIndex)
+std::tuple<std::string, std::string>
+    Firmware::getFirmwareName(uint8_t* dataIn, int targetIndex)
 {
     std::tuple<std::string, std::string> ret;
     auto& name = std::get<0>(ret);

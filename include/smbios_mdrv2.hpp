@@ -205,8 +205,8 @@ inline std::string decorateName(const std::string& path)
 {
 #ifdef PLATFORM_PREFIX
     std::filesystem::path filepath(path);
-    filepath.replace_filename(std::string(PLATFORM_PREFIX) + "_" +
-                              filepath.filename().string());
+    filepath.replace_filename(
+        std::string(PLATFORM_PREFIX) + "_" + filepath.filename().string());
     return filepath;
 #else
     return path;
@@ -351,9 +351,8 @@ static inline uint8_t* getSMBIOSTypePtr(uint8_t* smbiosDataIn, uint8_t typeId,
     return nullptr;
 }
 
-static inline uint8_t* getSMBIOSTypeIndexPtr(uint8_t* smbiosDataIn,
-                                             uint8_t typeId,
-                                             uint8_t targetIndex = 0)
+static inline uint8_t* getSMBIOSTypeIndexPtr(
+    uint8_t* smbiosDataIn, uint8_t typeId, uint8_t targetIndex = 0)
 {
     uint8_t* dataIn = smbiosDataIn;
 

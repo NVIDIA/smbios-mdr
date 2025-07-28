@@ -1,139 +1,134 @@
+option('tests', type: 'feature', value: 'disabled', description: 'Build tests')
+
 option(
-  'tests',
-   type: 'feature',
-   value: 'disabled',
-   description: 'Build tests'
+    'dimm-dbus',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Expose DIMM D-Bus Interface',
 )
 
 option(
-  'dimm-dbus',
-  type: 'feature',
-  value: 'enabled',
-  description: 'Expose DIMM D-Bus Interface'
+    'dimm-only-locator',
+    type: 'feature',
+    value: 'disabled',
+    description: 'Only use the DIMM number, and not the bank',
 )
 
 option(
-  'dimm-only-locator',
-  type: 'feature',
-  value: 'disabled',
-  description: 'Only use the DIMM number, and not the bank'
+    'dimm-location-code',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Expose DIMM LocationCode D-Bus interface and enable related features',
 )
 
 option(
-  'dimm-location-code',
-  type: 'feature',
-  value: 'enabled',
-  description: 'Expose DIMM LocationCode D-Bus interface and enable related features'
+    'cpu-dbus',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Expose CPU D-Bus Interface',
 )
 
 option(
-  'cpu-dbus',
-  type: 'feature',
-  value: 'enabled',
-  description: 'Expose CPU D-Bus Interface'
+    'cpu-dbus-chassisiface',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Add Chassis Interface into CPU D-Bus',
 )
 
 option(
-  'cpu-dbus-chassisiface',
-  type: 'feature',
-  value: 'enabled',
-  description: 'Add Chassis Interface into CPU D-Bus'
+    'procmod-dbus',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Expose Processor Module D-Bus Interface',
 )
 
 option(
-  'procmod-dbus',
-  type: 'feature',
-  value: 'enabled',
-  description: 'Expose Processor Module D-Bus Interface'
+    'assoc-trim-path',
+    type: 'feature',
+    value: 'disabled',
+    description: 'Trim one object path component from CPU and DIMM associations',
 )
 
 option(
-  'assoc-trim-path',
-  type: 'feature',
-  value: 'disabled',
-  description: 'Trim one object path component from CPU and DIMM associations'
+    'cpuinfo',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Build CPUInfo service',
 )
 
 option(
-  'cpuinfo',
-  type: 'feature',
-  value: 'enabled',
-  description: 'Build CPUInfo service'
+    'cpuinfo-peci',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Enable CPUInfo features that depend on PECI',
 )
 
 option(
-  'cpuinfo-peci',
-  type: 'feature',
-  value: 'enabled',
-  description: 'Enable CPUInfo features that depend on PECI'
+    'smbios-ipmi-blob',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Build IPMI blob library for SMBIOS transfer',
 )
 
 option(
-  'smbios-ipmi-blob',
-  type: 'feature',
-  value: 'enabled',
-  description: 'Build IPMI blob library for SMBIOS transfer'
+    'nvidia',
+    type: 'boolean',
+    value: 'false',
+    description: 'Enable NVIDIA features',
 )
 
 option(
-  'nvidia',
-  type: 'boolean',
-  value: 'false',
-  description: 'Enable NVIDIA features'
+    'expose-inventory',
+    type: 'boolean',
+    value: 'false',
+    description: 'Process Type 45 and report fw version',
 )
 
 option(
-  'expose-inventory',
-  type: 'boolean',
-  value: 'false',
-  description: 'Process Type 45 and report fw version'
+    'firmware-component-name-bmc',
+    type: 'string',
+    value: '',
+    description: 'BMC firmware component name in Type 45, it is used to avoid duplicated version object',
 )
 
 option(
-  'firmware-component-name-bmc',
-  type: 'string',
-  value: '',
-  description: 'BMC firmware component name in Type 45, it is used to avoid duplicated version object'
+    'firmware-component-name-bios',
+    type: 'string',
+    value: '',
+    description: 'BIOS firmware component name in Type 45, it is used to avoid duplicated version object',
 )
 
 option(
-  'firmware-component-name-bios',
-  type: 'string',
-  value: '',
-  description: 'BIOS firmware component name in Type 45, it is used to avoid duplicated version object'
+    'firmware-component-name-tpm',
+    type: 'string',
+    value: '',
+    description: 'TPM firmware component name in Type 45, it is used to avoid duplicated version object',
 )
 
 option(
-  'firmware-component-name-tpm',
-  type: 'string',
-  value: '',
-  description: 'TPM firmware component name in Type 45, it is used to avoid duplicated version object'
+    'firmware-component-name-nic',
+    type: 'string',
+    value: '',
+    description: 'NIC firmware component name in Type 45, it is used to avoid duplicated version object',
 )
 
 option(
-  'firmware-component-name-nic',
-  type: 'string',
-  value: '',
-  description: 'NIC firmware component name in Type 45, it is used to avoid duplicated version object'
+    'firmware-component-name-fpga',
+    type: 'string',
+    value: '',
+    description: 'FPGA firmware component name in Type 45, it is used to avoid duplicated version object',
 )
 
 option(
-  'firmware-component-name-fpga',
-  type: 'string',
-  value: '',
-  description: 'FPGA firmware component name in Type 45, it is used to avoid duplicated version object'
+    'platform-prefix',
+    type: 'string',
+    value: '',
+    description: 'Platform prefix, it prepend to DBus object name, such as ${PLATFORM_PREFIX}_CPU_0',
 )
 
 option(
-  'platform-prefix',
-  type: 'string',
-  value: '',
-  description: 'Platform prefix, it prepend to DBus object name, such as ${PLATFORM_PREFIX}_CPU_0'
-)
-
-option(
-  'copy-cpu-version-to-model',
-  type: 'boolean',
-  value: 'false',
-  description: 'Copy CPU version to model property'
+    'copy-cpu-version-to-model',
+    type: 'boolean',
+    value: 'false',
+    description: 'Copy CPU version to model property',
 )
