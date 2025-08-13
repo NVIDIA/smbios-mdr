@@ -753,6 +753,11 @@ void MDRV2::systemInfoUpdate()
         std::string biosComponentName(FIRMWARE_COMPONENT_NAME_BIOS);
         if (biosComponentName == firmwareName)
         {
+            // Store BIOS firmware version in the inventory path
+            firmwareCollection.emplace_back(
+                std::make_unique<phosphor::smbios::Firmware>(
+                    bus, smbiosInventoryPath + systemSuffix, index,
+                    smbiosDir.dir[smbiosDirIndex].dataStorage));
             continue;
         }
 #endif

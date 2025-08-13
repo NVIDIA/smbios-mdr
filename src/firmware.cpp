@@ -52,7 +52,21 @@ void Firmware::firmwareInfoUpdate(void)
 
     present(true);
 #ifdef EXPOSE_FW_INVENTORY
-    purpose(softwareversionIntf::VersionPurpose::Other);
+
+#ifdef FIRMWARE_COMPONENT_NAME_BIOS
+    std::string biosComponentName(FIRMWARE_COMPONENT_NAME_BIOS);
+#else
+    std::string biosComponentName = "";
+#endif
+
+    if ((!prettyName().empty()) && (prettyName() == biosComponentName))
+    {
+        purpose(softwareversionIntf::VersionPurpose::Host);
+    }
+    else
+    {
+        purpose(softwareversionIntf::VersionPurpose::Other);
+    }
 #endif
     std::vector<std::tuple<std::string, std::string, std::string>> association =
         {{"software_version", "functional", "/xyz/openbmc_project/software"}};
