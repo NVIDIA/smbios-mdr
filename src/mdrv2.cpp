@@ -599,9 +599,6 @@ void MDRV2::systemInfoUpdate()
                 {
                     // make the cpu under socket path
                     std::filesystem::path filePath(path);
-                    path.assign(modulePath)
-                        .append("/")
-                        .append(filePath.filename().string());
                     cpuContainerPath = modulePath;
                     break;
                 }
@@ -651,7 +648,7 @@ void MDRV2::systemInfoUpdate()
             }
         }
 
-        std::string path(defaultMotherboardPath);
+        std::string path(dimmPath);
         path += "/" + objName;
         dimms.emplace_back(std::make_unique<phosphor::smbios::Dimm>(
             *bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,

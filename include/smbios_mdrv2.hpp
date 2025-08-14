@@ -174,10 +174,13 @@ static constexpr const char* defaultMotherboardPath =
 
 #ifdef NVIDIA
 static constexpr const char* cpuPath =
-    "/xyz/openbmc_project/inventory/system/chassis/motherboard/CPU_";
+    "/xyz/openbmc_project/inventory/system/cpu/CPU_";
+static constexpr const char* dimmPath =
+    "/xyz/openbmc_project/inventory/system/dimm";
 #else
 static constexpr const char* cpuPath =
     "/xyz/openbmc_project/inventory/system/chassis/motherboard/cpu";
+static constexpr const char* dimmPath = defaultMotherboardPath;
 #endif
 static constexpr const char* cpuSuffix = "/chassis/motherboard/cpu";
 
@@ -205,9 +208,11 @@ inline std::string decorateName(const std::string& path)
 {
 #ifdef PLATFORM_PREFIX
     std::filesystem::path filepath(path);
-    filepath.replace_filename(std::string(PLATFORM_PREFIX) + "_" +
-                              filepath.filename().string());
-    return filepath;
+    std::filesystem::path parent(filepath.parent_path());
+    parent.replace_filename("component");
+    std::string filename(std::string(PLATFORM_PREFIX) + "_" +
+                         filepath.filename().string());
+    return std::string(parent) + "/" + filename;
 #else
     return path;
 #endif
