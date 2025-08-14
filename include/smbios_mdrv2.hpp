@@ -169,12 +169,18 @@ struct StructureHeader
     uint16_t handle;
 } __attribute__((packed));
 
+static constexpr const char* defaultMotherboardPath =
+    "/xyz/openbmc_project/inventory/system/chassis/motherboard";
+
 #ifdef NVIDIA
 static constexpr const char* cpuPath =
-    "/xyz/openbmc_project/inventory/system/chassis/motherboard/CPU_";
+    "/xyz/openbmc_project/inventory/system/cpu/CPU_";
+static constexpr const char* dimmPath =
+    "/xyz/openbmc_project/inventory/system/dimm";
 #else
 static constexpr const char* cpuPath =
     "/xyz/openbmc_project/inventory/system/chassis/motherboard/cpu";
+static constexpr const char* dimmPath = defaultMotherboardPath;
 #endif
 static constexpr const char* cpuSuffix = "/chassis/motherboard/cpu";
 
@@ -187,9 +193,6 @@ static constexpr const char* systemSuffix = "/chassis/motherboard/bios";
 static constexpr const char* tpmSuffix = "/chassis/motherboard/tpm";
 
 static constexpr const char* firmwarePath = "/xyz/openbmc_project/software";
-
-static constexpr const char* defaultMotherboardPath =
-    "/xyz/openbmc_project/inventory/system/chassis/motherboard";
 
 constexpr std::array<SMBIOSVersion, 8> supportedSMBIOSVersions{
     SMBIOSVersion{3, 0}, SMBIOSVersion{3, 2}, SMBIOSVersion{3, 3},
@@ -423,9 +426,11 @@ inline std::string decorateName(const std::string& path)
 {
 #ifdef PLATFORM_PREFIX
     std::filesystem::path filepath(path);
-    filepath.replace_filename(
+    std::filesystem::path parent(filepath.parent_path());
+    parent.replace_filename("component");
+    std::string filename(
         std::string(PLATFORM_PREFIX) + "_" + filepath.filename().string());
-    return filepath;
+    return std::string(parent) + "/" + filename;
 #else
     return path;
 #endif

@@ -394,6 +394,24 @@ class Cpu :
                 found = false;
             }
         }
+        else
+        {
+            // For google CPU name string
+            const std::regex socketRegex("CPU(\\d+)\\s*");
+            std::smatch match;
+            found = std::regex_match(socketDesignation, match, socketRegex);
+            if (found)
+            {
+                try
+                {
+                    socket = std::stoul(match[1]);
+                }
+                catch (std::exception& e)
+                {
+                    found = false;
+                }
+            }
+        }
 #endif
         return std::make_tuple(found, socket, chip);
     }
