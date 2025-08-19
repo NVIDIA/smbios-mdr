@@ -18,7 +18,7 @@
 #include "baseboard.hpp"
 #include "cpu.hpp"
 #include "dimm.hpp"
-#include "firmware.hpp"
+#include "firmware_inventory.hpp"
 #include "pcieslot.hpp"
 #include "smbios_mdrv2.hpp"
 #include "system.hpp"
@@ -195,8 +195,8 @@ class MDRV2 :
 
     bool agentSynchronizeData() override;
 
-    std::vector<uint32_t>
-        synchronizeDirectoryCommonData(uint8_t idIndex, uint32_t size) override;
+    std::vector<uint32_t> synchronizeDirectoryCommonData(
+        uint8_t idIndex, uint32_t size) override;
 
     uint8_t directoryEntries(uint8_t value) override;
 
@@ -223,16 +223,14 @@ class MDRV2 :
     inline uint8_t smbiosValidFlag(uint8_t index);
     void systemInfoUpdate(void);
 
-    std::optional<size_t> getTotalCpuSlot(void);
-    std::optional<size_t> getTotalDimmSlot(void);
-    std::optional<size_t> getTotalPcieSlot(void);
-    std::optional<size_t> getTotalNum(uint8_t typeId, size_t minSize = 0);
+    std::optional<size_t> getTotalSmbiosEntries(uint8_t smbiosType);
     std::vector<std::unique_ptr<Cpu>> cpus;
     std::vector<std::unique_ptr<Dimm>> dimms;
     std::vector<std::unique_ptr<Pcie>> pcies;
+    std::vector<std::unique_ptr<Tpm>> tpms;
+    std::vector<std::unique_ptr<FirmwareInventory>> firmwareCollection;
     std::unique_ptr<System> system;
     std::unique_ptr<Tpm> tpm;
-    std::vector<std::unique_ptr<Firmware>> firmwareCollection;
     std::vector<std::unique_ptr<Baseboard>> baseboards;
     std::shared_ptr<sdbusplus::asio::dbus_interface> smbiosInterface;
     std::unique_ptr<sdbusplus::bus::match_t> interfaceAddedMatch;

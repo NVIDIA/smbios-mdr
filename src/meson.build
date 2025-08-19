@@ -11,9 +11,27 @@ if get_option('dimm-only-locator').allowed()
     cpp_args_smbios += ['-DDIMM_ONLY_LOCATOR']
 endif
 
-if get_option('dimm-location-code').allowed()
-    cpp_args_smbios += ['-DDIMM_LOCATION_CODE']
+if get_option('slot-drive-presence').allowed()
+    cpp_args_smbios += ['-DSLOT_DRIVE_PRESENCE']
 endif
+
+if get_option('tpm-dbus').allowed()
+    cpp_args_smbios += ['-DTPM_DBUS']
+endif
+
+if get_option('firmware-inventory-dbus').allowed()
+    cpp_args_smbios += ['-DFIRMWARE_INVENTORY_DBUS']
+endif
+
+if get_option('expose-firmware-component-name').allowed()
+    cpp_args_smbios += ['-DEXPOSE_FW_COMPONENT_NAME']
+endif
+
+if get_option('custom-dbus-path').allowed()
+    cpp_args_smbios += ['-DCUSTOM_DBUS_PATH']
+endif
+
+## Downstream Meson Options
 
 if get_option('cpu-dbus').allowed()
     cpp_args_smbios += ['-DCPU_DBUS']
@@ -22,17 +40,6 @@ endif
 if get_option('cpu-dbus-chassisiface').allowed()
     cpp_args_smbios += ['-DCPU_DBUS_CHASSISIFACE']
 endif
-if get_option('procmod-dbus').allowed()
-    cpp_args_smbios += ['-DPROCMOD_DBUS']
-endif
-
-if get_option('nvidia')
-    cpp_args_smbios += ['-DNVIDIA']
-endif
-
-if get_option('expose-inventory')
-    cpp_args_smbios += ['-DEXPOSE_FW_INVENTORY']
-endif
 
 if get_option('copy-cpu-version-to-model')
     cpp_args_smbios += ['-DIS_COPY_CPU_VERSION_TO_MODEL=true']
@@ -40,17 +47,34 @@ else
     cpp_args_smbios += ['-DIS_COPY_CPU_VERSION_TO_MODEL=false']
 endif
 
+if get_option('dimm-location-code').allowed()
+    cpp_args_smbios += ['-DDIMM_LOCATION_CODE']
+endif
+
+if get_option('expose-inventory')
+    cpp_args_smbios += ['-DEXPOSE_FW_INVENTORY']
+endif
+
+if get_option('nvidia')
+    cpp_args_smbios += ['-DNVIDIA']
+endif
+
+if get_option('procmod-dbus').allowed()
+    cpp_args_smbios += ['-DPROCMOD_DBUS']
+endif
+
 executable(
     'smbiosmdrv2app',
     'mdrv2.cpp',
     'mdrv2_main.cpp',
     'cpu.cpp',
-    'chassisCpu.cpp',
     'dimm.cpp',
     'system.cpp',
     'pcieslot.cpp',
-    'firmware.cpp',
     'tpm.cpp',
+    'firmware_inventory.cpp',
+    'chassisCpu.cpp',
+    'nvidia_firmware_inventory.cpp',
     cpp_args: cpp_args_smbios,
     dependencies: [
         boost_dep,

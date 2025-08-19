@@ -44,38 +44,20 @@ void Pcie::pcieInfoUpdate(uint8_t* smbiosTableStorage,
 
     auto pcieInfo = reinterpret_cast<struct SystemSlotInfo*>(dataIn);
 
-    uint8_t slotHight = slotHeightNotApplicable;
-    // check if the data inside the valid length, some data might not exist in
-    // older SMBIOS version
-    auto isValid = [pcieInfo](void* varAddr, size_t length = 1) {
-        char* base = reinterpret_cast<char*>(pcieInfo);
-        char* data = reinterpret_cast<char*>(varAddr);
-        size_t offset = data - base;
-        if ((data >= base) && (offset + length - 1) < pcieInfo->length)
-        {
-            return true;
-        }
-        return false;
-    };
-    if (isValid(&pcieInfo->peerGorupingCount))
-    {
-        auto pcieInfoAfterPeerGroups =
-            reinterpret_cast<struct SystemSlotInfoAfterPeerGroups*>(
-                &(pcieInfo->peerGroups[pcieInfo->peerGorupingCount]));
-        if (isValid(&pcieInfoAfterPeerGroups->slotHeight))
-        {
-            slotHight = pcieInfoAfterPeerGroups->slotHeight;
-        }
-    }
-
     pcieGeneration(pcieInfo->slotType);
-    pcieType(pcieInfo->slotType, pcieInfo->slotLength, slotHight);
+    pcieType(pcieInfo->slotType, pcieInfo->slotLength);
     pcieLaneSize(pcieInfo->slotDataBusWidth);
     pcieIsHotPluggable(pcieInfo->characteristics2);
     pcieLocation(pcieInfo->slotDesignation, pcieInfo->length, dataIn);
 
+#ifdef SLOT_DRIVE_PRESENCE
+    /* Set PCIeSlot presence based on its current Usage */
+    Item::present(pcieInfo->currUsage ==
+                  static_cast<uint8_t>(Availability::InUse));
+#else
     /* Pcie slot is embedded on the board. Always be true */
     Item::present(true);
+#endif
 
     if (!motherboardPath.empty())
     {
@@ -99,29 +81,28 @@ void Pcie::pcieGeneration(const uint8_t type)
     }
 }
 
-void Pcie::pcieType(const uint8_t type, const uint8_t length,
-                    const uint8_t height)
+void Pcie::pcieType(const uint8_t type, const uint8_t slotLength)
 {
-    PCIeType dbusPcieType = PCIeType::Unknown;
-    std::map<uint8_t, PCIeType>::const_iterator it = pcieTypeTable.find(type);
-    if (it != pcieTypeTable.end() && it->second != PCIeType::Unknown)
+    // Try to find PCIeType in the main table
+    auto it = pcieTypeTable.find(type);
+    PCIeType pcieSlotType = PCIeType::Unknown;
+
+    if (it != pcieTypeTable.end())
     {
-        dbusPcieType = it->second;
+        pcieSlotType = it->second;
     }
-    else if (height == slotHeightLowProfile)
+    else
     {
-        dbusPcieType = PCIeType::LowProfile;
-    }
-    else if (length == slotLengthLong)
-    {
-        dbusPcieType = PCIeType::FullLength;
-    }
-    else if (length == slotLengthShort)
-    {
-        dbusPcieType = PCIeType::HalfLength;
+        // If not found in `pcieTypeTable`, check `PCIeTypeByLength`
+        auto slotIt = PCIeTypeByLength.find(slotLength);
+        if (slotIt != PCIeTypeByLength.end())
+        {
+            pcieSlotType = slotIt->second;
+        }
     }
 
-    PCIeSlot::slotType(dbusPcieType);
+    // Set the slot type
+    PCIeSlot::slotType(pcieSlotType);
 }
 
 void Pcie::pcieLaneSize(const uint8_t width)

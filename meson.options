@@ -15,34 +15,6 @@ option(
 )
 
 option(
-    'dimm-location-code',
-    type: 'feature',
-    value: 'enabled',
-    description: 'Expose DIMM LocationCode D-Bus interface and enable related features',
-)
-
-option(
-    'cpu-dbus',
-    type: 'feature',
-    value: 'enabled',
-    description: 'Expose CPU D-Bus Interface',
-)
-
-option(
-    'cpu-dbus-chassisiface',
-    type: 'feature',
-    value: 'enabled',
-    description: 'Add Chassis Interface into CPU D-Bus',
-)
-
-option(
-    'procmod-dbus',
-    type: 'feature',
-    value: 'enabled',
-    description: 'Expose Processor Module D-Bus Interface',
-)
-
-option(
     'assoc-trim-path',
     type: 'feature',
     value: 'disabled',
@@ -54,6 +26,13 @@ option(
     type: 'feature',
     value: 'enabled',
     description: 'Build CPUInfo service',
+)
+
+option(
+    'slot-drive-presence',
+    type: 'feature',
+    value: 'disabled',
+    description: 'Sets drive presence on slot objects',
 )
 
 option(
@@ -71,10 +50,59 @@ option(
 )
 
 option(
-    'nvidia',
+    'tpm-dbus',
+    type: 'feature',
+    value: 'disabled',
+    description: 'Expose TPM D-Bus Interface',
+)
+
+option(
+    'firmware-inventory-dbus',
+    type: 'feature',
+    value: 'disabled',
+    description: 'Expose Firmware Inventory D-Bus Interface',
+)
+
+option(
+    'expose-firmware-component-name',
+    type: 'feature',
+    value: 'disabled',
+    description: 'Use Firmware Component value as dbus object path',
+)
+
+option(
+    'custom-dbus-path',
+    type: 'feature',
+    value: 'disabled',
+    description: 'Use the Custom DBus object path for Inventory',
+)
+
+option(
+    'cpu-dbus',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Expose CPU D-Bus Interface',
+)
+
+option(
+    'cpu-dbus-chassisiface',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Add Chassis Interface into CPU D-Bus',
+)
+
+option(
+    'copy-cpu-version-to-model',
     type: 'boolean',
     value: 'false',
-    description: 'Enable NVIDIA features',
+    description: 'Copy CPU version to model property',
+)
+
+option(
+    'dimm-location-code',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Expose DIMM LocationCode D-Bus interface and enable related features',
 )
 
 option(
@@ -120,6 +148,13 @@ option(
 )
 
 option(
+    'nvidia',
+    type: 'boolean',
+    value: 'false',
+    description: 'Enable NVIDIA features',
+)
+
+option(
     'platform-prefix',
     type: 'string',
     value: '',
@@ -127,8 +162,8 @@ option(
 )
 
 option(
-    'copy-cpu-version-to-model',
-    type: 'boolean',
-    value: 'false',
-    description: 'Copy CPU version to model property',
+    'procmod-dbus',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Expose Processor Module D-Bus Interface',
 )

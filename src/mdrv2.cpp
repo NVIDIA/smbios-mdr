@@ -38,7 +38,7 @@ std::vector<uint8_t> MDRV2::getDirectoryInformation(uint8_t dirIndex)
     std::ifstream smbiosFile(smbiosFilePath, std::ios_base::binary);
     if (!smbiosFile.good())
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
+        lg2::error(
             "Read data from flash error - Open MDRV2 table file failure");
         throw sdbusplus::xyz::openbmc_project::Smbios::MDR_V2::Error::
             InvalidParameter();
@@ -126,8 +126,7 @@ std::vector<uint8_t> MDRV2::getDataOffer()
     }
     else
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "smbios is not ready for update");
+        lg2::error("smbios is not ready for update");
         throw sdbusplus::xyz::openbmc_project::Smbios::MDR_V2::Error::
             UpdateInProgress();
     }
@@ -206,20 +205,18 @@ bool MDRV2::readDataFromFlash(MDRSMBIOSHeader* mdrHdr, uint8_t* data)
 {
     if (mdrHdr == nullptr)
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "Read data from flash error - Invalid mdr header");
+        lg2::error("Read data from flash error - Invalid mdr header");
         return false;
     }
     if (data == nullptr)
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "Read data from flash error - Invalid data point");
+        lg2::error("Read data from flash error - Invalid data point");
         return false;
     }
     std::ifstream smbiosFile(smbiosFilePath, std::ios_base::binary);
     if (!smbiosFile.good())
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
+        lg2::error(
             "Read data from flash error - Open MDRV2 table file failure");
         return false;
     }
@@ -229,15 +226,13 @@ bool MDRV2::readDataFromFlash(MDRSMBIOSHeader* mdrHdr, uint8_t* data)
     smbiosFile.seekg(0, std::ios_base::beg);
     if (fileLength < sizeof(MDRSMBIOSHeader))
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "MDR V2 file size is smaller than mdr header");
+        lg2::error("MDR V2 file size is smaller than mdr header");
         return false;
     }
     smbiosFile.read(reinterpret_cast<char*>(mdrHdr), sizeof(MDRSMBIOSHeader));
     if (mdrHdr->dataSize > smbiosTableStorageSize)
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "Data size out of limitation");
+        lg2::error("Data size out of limitation");
         smbiosFile.close();
         return false;
     }
@@ -261,16 +256,14 @@ bool MDRV2::sendDirectoryInformation(
     bool terminate = false;
     if ((dirIndex >= maxDirEntries) || (returnedEntries < 1))
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "Send Dir info failed - input parameter invalid");
+        lg2::error("Send Dir info failed - input parameter invalid");
         throw sdbusplus::xyz::openbmc_project::Smbios::MDR_V2::Error::
             InvalidParameter();
     }
     if ((static_cast<size_t>(returnedEntries) * sizeof(DataIdStruct)) !=
         dirEntry.size())
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "Directory size invalid");
+        lg2::error("Directory size invalid");
         throw sdbusplus::xyz::openbmc_project::Smbios::MDR_V2::Error::
             InvalidParameter();
     }
@@ -346,8 +339,7 @@ int MDRV2::findIdIndex(std::vector<uint8_t> dataInfo)
 {
     if (dataInfo.size() != sizeof(DataIdStruct))
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "Length of dataInfo invalid");
+        lg2::error("Length of dataInfo invalid");
         throw sdbusplus::xyz::openbmc_project::Smbios::MDR_V2::Error::
             InvalidId();
     }
@@ -379,7 +371,7 @@ uint8_t MDRV2::directoryEntries(uint8_t value)
     std::ifstream smbiosFile(smbiosFilePath, std::ios_base::binary);
     if (!smbiosFile.good())
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
+        lg2::error(
             "Read data from flash error - Open MDRV2 table file failure");
         value = 0;
     }
@@ -411,7 +403,7 @@ void MDRV2::systemInfoUpdate()
 
     std::string motherboardPath;
     auto method = bus->new_method_call(mapperBusName, mapperPath,
-                                       mapperInterface, "GetSubTree");
+                                       mapperInterface, "GetSubTreePaths");
     method.append(mapperAncestorPath);
     method.append(0);
 
@@ -425,38 +417,20 @@ void MDRV2::systemInfoUpdate()
 
     try
     {
-        std::map<std::string, std::map<std::string, std::set<std::string>>>
-            subtree;
+        std::vector<std::string> paths;
         sdbusplus::message_t reply = bus->call(method);
-        reply.read(subtree);
-        if (subtree.size() < 1)
-        {
-            phosphor::logging::log<phosphor::logging::level::ERR>(
-                "Failed to get system motherboard dbus path.");
-        }
+        reply.read(paths);
 
-        // If we found more than 1 system, select one with chassis intf
-        if (subtree.size() > 1)
+        size_t pathsCount = paths.size();
+        for (size_t i = 0; i < pathsCount; ++i)
         {
-            for (const auto& [path, services] : subtree)
+            if (requireExactMatch && (paths[i] != smbiosInventoryPath))
             {
-                for (const auto& [service, interfaces] : services)
-                {
-                    if (interfaces.contains(chassisInterface))
-                    {
-                        motherboardPath = path;
-                        break;
-                    }
-                }
-                if (!motherboardPath.empty())
-                {
-                    break;
-                }
+                continue;
             }
-        }
-        if (motherboardPath.empty() && subtree.size() != 0)
-        {
-            motherboardPath = subtree.begin()->first;
+
+            motherboardPath = std::move(paths[i]);
+            break;
         }
     }
     catch (const sdbusplus::exception_t& e)
@@ -464,10 +438,79 @@ void MDRV2::systemInfoUpdate()
         lg2::error(
             "Exception while trying to find Inventory anchor object for SMBIOS content {I}: {E}",
             "I", smbiosInventoryPath, "E", e.what());
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "Failed to query system motherboard",
-            phosphor::logging::entry("ERROR=%s", e.what()));
+        lg2::error("Failed to query system motherboard: {ERROR}", "ERROR",
+                   e.what());
     }
+
+    if (motherboardPath.empty())
+    {
+        lg2::error(
+            "Failed to get system motherboard dbus path. Setting up a match rule");
+
+        if (motherboardConfigMatch)
+        {
+            lg2::info("Motherboard match rule already exists");
+        }
+        else
+        {
+            motherboardConfigMatch = std::make_unique<sdbusplus::bus::match_t>(
+                *bus,
+                sdbusplus::bus::match::rules::interfacesAdded() +
+                    sdbusplus::bus::match::rules::argNpath(0, matchParentPath),
+                [this, requireExactMatch](sdbusplus::message_t& msg) {
+                    sdbusplus::message::object_path objectName;
+                    boost::container::flat_map<
+                        std::string,
+                        boost::container::flat_map<
+                            std::string, std::variant<std::string, uint64_t>>>
+                        msgData;
+                    msg.read(objectName, msgData);
+                    bool gotMatch = false;
+
+                    if (msgData.contains(systemInterface))
+                    {
+                        lg2::info("Successful match on system interface");
+                        gotMatch = true;
+                    }
+
+                    // If customized, also accept Board as anchor, not just
+                    // System
+                    if (requireExactMatch && msgData.contains(boardInterface))
+                    {
+                        lg2::info("Successful match on board interface");
+                        gotMatch = true;
+                    }
+
+                    if (gotMatch)
+                    {
+                        // There is a race condition here: our desired interface
+                        // has just been created, triggering the D-Bus callback,
+                        // but Object Mapper has not been told of it yet. The
+                        // mapper must also add it. Stall for time, so it can.
+                        sleep(2);
+                        systemInfoUpdate();
+                    }
+                });
+        }
+    }
+    else
+    {
+#ifdef ASSOC_TRIM_PATH
+        // When enabled, chop off last component of motherboardPath, to trim one
+        // layer, so that associations are built to the underlying chassis
+        // itself, not the system boards in the chassis. This is for
+        // compatibility with traditional systems which only have one
+        // motherboard per chassis.
+        std::filesystem::path foundPath(motherboardPath);
+        motherboardPath = foundPath.parent_path().string();
+#endif
+
+        lg2::info("Found Inventory anchor object for SMBIOS content {I}: {M}",
+                  "I", smbiosInventoryPath, "M", motherboardPath);
+    }
+
+    lg2::info("Using Inventory anchor object for SMBIOS content {I}: {M}", "I",
+              smbiosInventoryPath, "M", motherboardPath);
 
     // Get ProcessorModule inventories
     std::vector<std::pair<std::string, std::optional<size_t>>> modules;
@@ -537,7 +580,7 @@ void MDRV2::systemInfoUpdate()
 #ifdef PROCMOD_DBUS
     int processorModuleIndex = 0;
     baseboards.clear();
-    num = getTotalNum(baseboardType);
+    num = getTotalSmbiosEntries(baseboardType);
     if (!num)
     {
         phosphor::logging::log<phosphor::logging::level::ERR>(
@@ -566,11 +609,10 @@ void MDRV2::systemInfoUpdate()
 
 #ifdef CPU_DBUS
     cpus.clear();
-    num = getTotalCpuSlot();
+    num = getTotalSmbiosEntries(processorsType);
     if (!num)
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "get cpu total slot failed");
+        lg2::error("get cpu total slot failed");
         return;
     }
 
@@ -616,11 +658,10 @@ void MDRV2::systemInfoUpdate()
 
 #ifdef DIMM_DBUS
     dimms.clear();
-    num = getTotalDimmSlot();
+    num = getTotalSmbiosEntries(memoryDeviceType);
     if (!num)
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "get dimm total slot failed");
+        lg2::error("get dimm total slot failed");
         return;
     }
 
@@ -659,11 +700,10 @@ void MDRV2::systemInfoUpdate()
 #endif
 
     pcies.clear();
-    num = getTotalPcieSlot();
+    num = getTotalSmbiosEntries(systemSlots);
     if (!num)
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "get pcie total slot failed");
+        lg2::error("get pcie total slot failed");
         return;
     }
 
@@ -675,15 +715,8 @@ void MDRV2::systemInfoUpdate()
 
     for (unsigned int index = 0; index < *num; index++)
     {
-        std::string path =
-            smbiosInventoryPath + pcieSuffix + std::to_string(index);
-        // PCIeSlots need to start with same inventory path as the system path
-        if (!motherboardPath.empty() &&
-            path.starts_with(defaultMotherboardPath))
-        {
-            path.replace(0, strlen(defaultMotherboardPath), motherboardPath);
-        }
-
+        std::string path = getObjectPath(smbiosInventoryPath, motherboardPath,
+                                         pcieSuffix, index);
         if (index + 1 > pcies.size())
         {
             pcies.emplace_back(std::make_unique<phosphor::smbios::Pcie>(
@@ -697,132 +730,69 @@ void MDRV2::systemInfoUpdate()
         }
     }
 
-    tpm.reset();
-    if (getTotalNum(tpmDeviceType) == 1)
-    {
-        std::string path = tpmPath;
-        if (!motherboardPath.empty() &&
-            path.starts_with(defaultMotherboardPath))
-        {
-            path.replace(0, strlen(defaultMotherboardPath), motherboardPath);
-        }
-        tpm = std::make_unique<Tpm>(bus, path,
-                                    smbiosDir.dir[smbiosDirIndex].dataStorage);
-    }
+#ifdef TPM_DBUS
 
-    firmwareCollection.clear();
-    std::vector<std::string> existedVersionPaths;
-    auto getVersionPaths = bus->new_method_call(
-        mapperBusName, mapperPath, mapperInterface, "GetSubTreePaths");
-    getVersionPaths.append(firmwarePath);
-    getVersionPaths.append(0);
-    getVersionPaths.append(std::array<std::string, 1>({versionInterface}));
-    try
-    {
-        sdbusplus::message_t reply = bus->call(getVersionPaths);
-        reply.read(existedVersionPaths);
-    }
-    catch (const sdbusplus::exception_t& e)
-    {
-        lg2::error("Failed to query version objects. ERROR={ERROR}", "ERROR",
-                   e.what());
-        existedVersionPaths.clear();
-    }
-
-    num = getTotalNum(firmwareInventoryInformationType);
+    num = getTotalSmbiosEntries(tpmDeviceType);
     if (!num)
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "get firmware failed");
+        lg2::error("get tpm failed");
+        return;
+    }
+    // In case the new size is smaller than old, trim the vector
+    if (*num < tpms.size())
+    {
+        tpms.resize(*num);
+    }
+
+    for (unsigned int index = 0; index < *num; index++)
+    {
+        std::string path = getObjectPath(smbiosInventoryPath, motherboardPath,
+                                         tpmSuffix, index);
+        if (index + 1 > tpms.size())
+        {
+            tpms.emplace_back(std::make_unique<phosphor::smbios::Tpm>(
+                *bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
+                motherboardPath));
+        }
+        else
+        {
+            tpms[index]->tpmInfoUpdate(
+                smbiosDir.dir[smbiosDirIndex].dataStorage, motherboardPath);
+        }
+    }
+#endif
+
+#ifdef FIRMWARE_INVENTORY_DBUS
+
+    auto existingVersionPaths = utils::getExistingVersionPaths(*bus);
+    num = getTotalSmbiosEntries(firmwareInventoryInformationType);
+    if (!num)
+    {
+        lg2::error("get firmware inventory failed");
+        existingVersionPaths.clear();
         return;
     }
 
-    for (size_t index = 0; index < *num; index++)
+    // In case the new size is smaller than old, trim the vector
+    if (*num < firmwareCollection.size())
     {
-        std::string path = firmwarePath;
-        auto [firmwareName, objName] = Firmware::getFirmwareName(
-            smbiosDir.dir[smbiosDirIndex].dataStorage, index);
-#ifdef FIRMWARE_COMPONENT_NAME_BMC
-        std::string bmcComponentName(FIRMWARE_COMPONENT_NAME_BMC);
-        if (bmcComponentName == firmwareName)
-        {
-            continue;
-        }
-#endif
-#ifdef FIRMWARE_COMPONENT_NAME_BIOS
-        std::string biosComponentName(FIRMWARE_COMPONENT_NAME_BIOS);
-        if (biosComponentName == firmwareName)
-        {
-            // Store BIOS firmware version in the inventory path
-            firmwareCollection.emplace_back(
-                std::make_unique<phosphor::smbios::Firmware>(
-                    bus, smbiosInventoryPath + systemSuffix, index,
-                    smbiosDir.dir[smbiosDirIndex].dataStorage));
-            continue;
-        }
-#endif
-#ifdef FIRMWARE_COMPONENT_NAME_NIC
-        std::string nicComponentName(FIRMWARE_COMPONENT_NAME_NIC);
-        if (firmwareName.rfind(nicComponentName) != std::string::npos)
-        {
-            continue;
-        }
-#endif
-#ifdef FIRMWARE_COMPONENT_NAME_FPGA
-        std::string fpgaComponentName(FIRMWARE_COMPONENT_NAME_FPGA);
-        if (firmwareName.rfind(fpgaComponentName) != std::string::npos)
-        {
-            continue;
-        }
-#endif
-#ifdef FIRMWARE_COMPONENT_NAME_TPM
-        std::string tpmComponentName(FIRMWARE_COMPONENT_NAME_TPM);
-        if (tpmComponentName == firmwareName)
-        {
-            continue;
-        }
-#endif
-
-        if (objName.empty())
-        {
-            objName = "firmware" + std::to_string(index);
-        }
-        objName =
-            std::regex_replace(objName, std::regex("[^a-zA-Z0-9_/]+"), "_");
-
-        // Skip if we have the same object name on DBUS, BIOS probably fetchs it
-        // from BMC.
-        auto eqObjName = [objName](std::string s) {
-            std::filesystem::path p(s);
-            return p.filename().compare(objName) == 0;
-        };
-        if (std::find_if(existedVersionPaths.begin(), existedVersionPaths.end(),
-                         std::move(eqObjName)) != existedVersionPaths.end())
-        {
-            continue;
-        }
-
-        path.append("/").append(objName);
-        try
-        {
-            std::string cp = path;
-            std::transform(cp.begin(), cp.end(), cp.begin(), ::tolower);
-
-            if (cp.find("psu") != std::string::npos)
-                continue;
-
-            firmwareCollection.emplace_back(
-                std::make_unique<phosphor::smbios::Firmware>(
-                    bus, path, index,
-                    smbiosDir.dir[smbiosDirIndex].dataStorage));
-        }
-        catch (const sdbusplus::exception_t& e)
-        {
-            phosphor::logging::log<phosphor::logging::level::ERR>(
-                "Failed to create firmware object",
-                phosphor::logging::entry("ERROR=%s", e.what()));
-        }
+        firmwareCollection.resize(*num);
     }
+    for (unsigned int index = 0; index < *num; index++)
+    {
+        auto path = FirmwareInventory::checkAndCreateFirmwarePath(
+            smbiosDir.dir[smbiosDirIndex].dataStorage, index,
+            existingVersionPaths);
+        if (path.empty())
+        {
+            continue;
+        }
+        firmwareCollection.emplace_back(
+            std::make_unique<phosphor::smbios::FirmwareInventory>(
+                *bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage));
+    }
+
+#endif
 
     system.reset();
     system = std::make_unique<System>(bus, smbiosInventoryPath + systemSuffix,
@@ -830,146 +800,48 @@ void MDRV2::systemInfoUpdate()
                                       smbiosFilePath);
 }
 
-std::optional<size_t> MDRV2::getTotalCpuSlot()
+std::optional<size_t> MDRV2::getTotalSmbiosEntries(uint8_t smbiosType)
 {
     uint8_t* dataIn = smbiosDir.dir[smbiosDirIndex].dataStorage;
     size_t num = 0;
 
     if (dataIn == nullptr)
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "get cpu total slot failed - no storage data");
+        lg2::error("Failed to get SMBIOS entries for type {TYPE}", "TYPE",
+                   smbiosType);
         return std::nullopt;
     }
 
     while (1)
     {
-        dataIn = getSMBIOSTypePtr(dataIn, processorsType);
-        if (dataIn == nullptr)
-        {
-            break;
-        }
-        num++;
-        dataIn = smbiosNextPtr(dataIn);
-        if (dataIn == nullptr)
-        {
-            break;
-        }
-        if (num >= limitEntryLen)
-        {
-            break;
-        }
-    }
-
-    return num;
-}
-
-std::optional<size_t> MDRV2::getTotalDimmSlot()
-{
-    uint8_t* dataIn = smbiosDir.dir[smbiosDirIndex].dataStorage;
-    size_t num = 0;
-
-    if (dataIn == nullptr)
-    {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "Fail to get dimm total slot - no storage data");
-        return std::nullopt;
-    }
-
-    while (1)
-    {
-        dataIn = getSMBIOSTypePtr(dataIn, memoryDeviceType);
-        if (dataIn == nullptr)
-        {
-            break;
-        }
-        num++;
-        dataIn = smbiosNextPtr(dataIn);
-        if (dataIn == nullptr)
-        {
-            break;
-        }
-        if (num >= limitEntryLen)
-        {
-            break;
-        }
-    }
-
-    return num;
-}
-
-std::optional<size_t> MDRV2::getTotalPcieSlot()
-{
-    uint8_t* dataIn = smbiosDir.dir[smbiosDirIndex].dataStorage;
-    size_t num = 0;
-
-    if (dataIn == nullptr)
-    {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "Fail to get total system slot - no storage data");
-        return std::nullopt;
-    }
-
-    while (1)
-    {
-        dataIn = getSMBIOSTypePtr(dataIn, systemSlots);
+        dataIn = getSMBIOSTypePtr(dataIn, smbiosType);
         if (dataIn == nullptr)
         {
             break;
         }
 
-        /* System slot type offset. Check if the slot is a PCIE slots. All
-         * PCIE slot type are hardcoded in a table.
-         */
-        if (pcieSmbiosType.find(*(dataIn + 5)) != pcieSmbiosType.end())
+        // Special handling for PCIe slots
+        if (smbiosType == systemSlots)
+        {
+            if (pcieSmbiosType.find(*(dataIn + 5)) != pcieSmbiosType.end())
+            {
+                num++;
+            }
+        }
+        else
         {
             num++;
         }
+        if (num >= limitEntryLen)
+        {
+            break;
+        }
         dataIn = smbiosNextPtr(dataIn);
         if (dataIn == nullptr)
         {
             break;
         }
-        if (num >= limitEntryLen)
-        {
-            break;
-        }
     }
-
-    return num;
-}
-
-std::optional<size_t> MDRV2::getTotalNum(uint8_t typeId, size_t minSize)
-{
-    uint8_t* dataIn = smbiosDir.dir[smbiosDirIndex].dataStorage;
-    size_t num = 0;
-
-    if (dataIn == nullptr)
-    {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "no storage data");
-        return std::nullopt;
-    }
-
-    while (1)
-    {
-        dataIn = getSMBIOSTypePtr(dataIn, typeId, minSize);
-        if (dataIn == nullptr)
-        {
-            break;
-        }
-        num++;
-        dataIn = smbiosNextPtr(dataIn);
-        if (dataIn == nullptr)
-        {
-            break;
-        }
-        if (num >= limitEntryLen)
-        {
-            break;
-        }
-    }
-
     return num;
 }
 
@@ -985,14 +857,12 @@ bool MDRV2::checkSMBIOSVersion(uint8_t* dataIn)
     bool smbios21Found = it != std::end(buffer);
     if (!smbios21Found)
     {
-        phosphor::logging::log<phosphor::logging::level::INFO>(
-            "SMBIOS 2.1 Anchor String not found. Looking for SMBIOS 3.0");
+        lg2::info("SMBIOS 2.1 Anchor String not found. Looking for SMBIOS 3.0");
         it = std::search(std::begin(buffer), std::end(buffer),
                          std::begin(anchorString30), std::end(anchorString30));
         if (it == std::end(buffer))
         {
-            phosphor::logging::log<phosphor::logging::level::ERR>(
-                "SMBIOS 2.1 and 3.0 Anchor Strings not found");
+            lg2::error("SMBIOS 2.1 and 3.0 Anchor Strings not found");
             return false;
         }
     }
@@ -1006,8 +876,7 @@ bool MDRV2::checkSMBIOSVersion(uint8_t* dataIn)
     {
         if (length < sizeof(EntryPointStructure21))
         {
-            phosphor::logging::log<phosphor::logging::level::ERR>(
-                "Invalid entry point structure for SMBIOS 2.1");
+            lg2::error("Invalid entry point structure for SMBIOS 2.1");
             return false;
         }
 
@@ -1020,8 +889,7 @@ bool MDRV2::checkSMBIOSVersion(uint8_t* dataIn)
     {
         if (length < sizeof(EntryPointStructure30))
         {
-            phosphor::logging::log<phosphor::logging::level::ERR>(
-                "Invalid entry point structure for SMBIOS 3.0");
+            lg2::error("Invalid entry point structure for SMBIOS 3.0");
             return false;
         }
 
@@ -1041,6 +909,7 @@ bool MDRV2::checkSMBIOSVersion(uint8_t* dataIn)
         });
     if (itr == std::end(supportedSMBIOSVersions))
     {
+        lg2::error("Unsupported SMBIOS table version");
         return false;
     }
     return true;
@@ -1055,31 +924,23 @@ bool MDRV2::agentSynchronizeData()
                                     smbiosDir.dir[smbiosDirIndex].dataStorage);
     if (!status)
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "agent data sync failed - read data from flash failed");
+        lg2::error("agent data sync failed - read data from flash failed");
         return false;
     }
 
     if (!checkSMBIOSVersion(smbiosDir.dir[smbiosDirIndex].dataStorage))
     {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "Unsupported SMBIOS table version");
+        lg2::error("Unsupported SMBIOS table version");
         return false;
     }
 
-    // Defer systemInfoUpdate() to speed up reply
-    std::chrono::microseconds usec(defaultTimeout);
-    timer.expires_after(usec);
-    timer.async_wait([this](boost::system::error_code ec) {
-        if (ec || this == nullptr)
-        {
-            phosphor::logging::log<phosphor::logging::level::ERR>(
-                "Timer Error!");
-            return;
-        }
-        systemInfoUpdate();
-    });
+    if (0 == static_cast<uint8_t>(sdbusplus::server::xyz::openbmc_project::
+                                      smbios::MDRV2::directoryEntries()))
+    {
+        directoryEntries(smbiosDir.dirEntries);
+    }
 
+    systemInfoUpdate();
     smbiosDir.dir[smbiosDirIndex].common.dataVersion = mdr2SMBIOS.dirVer;
     smbiosDir.dir[smbiosDirIndex].common.timestamp = mdr2SMBIOS.timestamp;
     smbiosDir.dir[smbiosDirIndex].common.size = mdr2SMBIOS.dataSize;
@@ -1089,8 +950,8 @@ bool MDRV2::agentSynchronizeData()
     return true;
 }
 
-std::vector<uint32_t>
-    MDRV2::synchronizeDirectoryCommonData(uint8_t idIndex, uint32_t size)
+std::vector<uint32_t> MDRV2::synchronizeDirectoryCommonData(uint8_t idIndex,
+                                                            uint32_t size)
 {
     std::chrono::microseconds usec(
         defaultTimeout); // default lock time out is 2s
@@ -1104,8 +965,7 @@ std::vector<uint32_t>
     timer.async_wait([this](boost::system::error_code ec) {
         if (ec)
         {
-            phosphor::logging::log<phosphor::logging::level::ERR>(
-                "Timer Error!");
+            lg2::error("Timer Error!");
             return;
         }
         agentSynchronizeData();

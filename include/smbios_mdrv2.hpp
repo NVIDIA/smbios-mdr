@@ -169,9 +169,6 @@ struct StructureHeader
     uint16_t handle;
 } __attribute__((packed));
 
-static constexpr const char* defaultMotherboardPath =
-    "/xyz/openbmc_project/inventory/system/chassis/motherboard";
-
 #ifdef NVIDIA
 static constexpr const char* cpuPath =
     "/xyz/openbmc_project/inventory/system/chassis/motherboard/CPU_";
@@ -185,33 +182,14 @@ static constexpr const char* dimmSuffix = "/chassis/motherboard/dimm";
 
 static constexpr const char* pcieSuffix = "/chassis/motherboard/pcieslot";
 
-static constexpr const char* systemPath = "/xyz/openbmc_project/software/bios";
-
-static constexpr const char* tpmPath =
-    "/xyz/openbmc_project/inventory/system/chassis/motherboard/tpm";
 static constexpr const char* systemSuffix = "/chassis/motherboard/bios";
+
+static constexpr const char* tpmSuffix = "/chassis/motherboard/tpm";
 
 static constexpr const char* firmwarePath = "/xyz/openbmc_project/software";
 
-/**
- * @brief This function takes a string argument representing a file path and, if
- * the PLATFORM_PREFIX macro is defined, modifies the filename by adding a
- * platform-specific prefix to it. If the macro is not defined, the function
- * returns the input path unmodified.
- * @param path The input file path to decorate.
- * @return A string representing the decorated file path.
- */
-inline std::string decorateName(const std::string& path)
-{
-#ifdef PLATFORM_PREFIX
-    std::filesystem::path filepath(path);
-    filepath.replace_filename(
-        std::string(PLATFORM_PREFIX) + "_" + filepath.filename().string());
-    return filepath;
-#else
-    return path;
-#endif
-}
+static constexpr const char* defaultMotherboardPath =
+    "/xyz/openbmc_project/inventory/system/chassis/motherboard";
 
 constexpr std::array<SMBIOSVersion, 8> supportedSMBIOSVersions{
     SMBIOSVersion{3, 0}, SMBIOSVersion{3, 2}, SMBIOSVersion{3, 3},
@@ -246,29 +224,6 @@ typedef enum
 
 static constexpr uint8_t separateLen = 2;
 
-static inline uint8_t* smbiosSkipEntryPoint(uint8_t* smbiosDataIn)
-{
-    if (smbiosDataIn == nullptr)
-    {
-        return nullptr;
-    }
-
-    // Jump to starting address of the SMBIOS Structure Table from Entry Point
-    auto anchor = reinterpret_cast<const char*>(smbiosDataIn);
-    if (std::string_view(anchor, anchorString30.length())
-            .compare(anchorString30) == 0)
-    {
-        auto epStructure =
-            reinterpret_cast<const EntryPointStructure30*>(smbiosDataIn);
-        if (epStructure->structTableAddr < mdrSMBIOSSize)
-        {
-            smbiosDataIn += epStructure->structTableAddr;
-        }
-    }
-
-    return smbiosDataIn;
-}
-
 static inline uint8_t* smbiosNextPtr(uint8_t* smbiosDataIn)
 {
     if (smbiosDataIn == nullptr)
@@ -289,27 +244,6 @@ static inline uint8_t* smbiosNextPtr(uint8_t* smbiosDataIn)
     return smbiosData + separateLen;
 }
 
-static inline uint8_t* smbiosHandlePtr(uint8_t* smbiosDataIn, uint16_t handle)
-{
-    auto ptr = smbiosSkipEntryPoint(smbiosDataIn);
-    struct StructureHeader* header;
-    while (ptr != nullptr)
-    {
-        header = reinterpret_cast<struct StructureHeader*>(ptr);
-        if (header->length < sizeof(StructureHeader))
-        {
-            return nullptr;
-        }
-
-        if (header->handle == handle)
-        {
-            return ptr;
-        }
-        ptr = smbiosNextPtr(ptr);
-    }
-    return nullptr;
-}
-
 // When first time run getSMBIOSTypePtr, need to send the RegionS[].regionData
 // to smbiosDataIn
 static inline uint8_t* getSMBIOSTypePtr(uint8_t* smbiosDataIn, uint8_t typeId,
@@ -319,9 +253,7 @@ static inline uint8_t* getSMBIOSTypePtr(uint8_t* smbiosDataIn, uint8_t typeId,
     {
         return nullptr;
     }
-    smbiosDataIn = smbiosSkipEntryPoint(smbiosDataIn);
     char* smbiosData = reinterpret_cast<char*>(smbiosDataIn);
-
     while ((*smbiosData != '\0') || (*(smbiosData + 1) != '\0'))
     {
         uint32_t len = *(smbiosData + 1);
@@ -351,32 +283,82 @@ static inline uint8_t* getSMBIOSTypePtr(uint8_t* smbiosDataIn, uint8_t typeId,
     return nullptr;
 }
 
-static inline uint8_t* getSMBIOSTypeIndexPtr(
-    uint8_t* smbiosDataIn, uint8_t typeId, uint8_t targetIndex = 0)
+// Get the nth occurrence of a specific SMBIOS type
+static inline uint8_t* getSMBIOSTypeIndexPtr(uint8_t* smbiosDataIn,
+                                             uint8_t typeId, int index)
 {
-    uint8_t* dataIn = smbiosDataIn;
-
-    dataIn = getSMBIOSTypePtr(dataIn, typeId);
-    if (dataIn == nullptr)
+    if (smbiosDataIn == nullptr)
     {
         return nullptr;
     }
 
-    for (uint8_t index = 0; index < targetIndex; index++)
+    uint8_t* currentPtr = smbiosDataIn;
+    int currentIndex = 0;
+
+    while (currentPtr != nullptr)
     {
-        dataIn = smbiosNextPtr(dataIn);
-        if (dataIn == nullptr)
+        currentPtr = getSMBIOSTypePtr(currentPtr, typeId);
+        if (currentPtr == nullptr)
         {
-            return nullptr;
+            break;
         }
-        dataIn = getSMBIOSTypePtr(dataIn, typeId);
-        if (dataIn == nullptr)
+
+        if (currentIndex == index)
         {
-            return nullptr;
+            return currentPtr;
+        }
+
+        currentIndex++;
+        // Move to next entry to continue searching
+        currentPtr = smbiosNextPtr(currentPtr);
+    }
+
+    return nullptr;
+}
+
+static inline uint8_t* smbiosSkipEntryPoint(uint8_t* smbiosDataIn)
+{
+    const std::string anchorString30 = "_SM3_";
+    if (smbiosDataIn == nullptr)
+    {
+        return nullptr;
+    }
+
+    // Jump to starting address of the SMBIOS Structure Table from Entry Point
+    auto anchor = reinterpret_cast<const char*>(smbiosDataIn);
+    if (std::string_view(anchor, anchorString30.length())
+            .compare(anchorString30) == 0)
+    {
+        auto epStructure =
+            reinterpret_cast<const EntryPointStructure30*>(smbiosDataIn);
+        if (epStructure->structTableAddr < mdrSMBIOSSize)
+        {
+            smbiosDataIn += epStructure->structTableAddr;
         }
     }
 
-    return dataIn;
+    return smbiosDataIn;
+}
+
+static inline uint8_t* smbiosHandlePtr(uint8_t* smbiosDataIn, uint16_t handle)
+{
+    auto ptr = smbiosSkipEntryPoint(smbiosDataIn);
+    struct StructureHeader* header;
+    while (ptr != nullptr)
+    {
+        header = reinterpret_cast<struct StructureHeader*>(ptr);
+        if (header->length < sizeof(StructureHeader))
+        {
+            return nullptr;
+        }
+
+        if (header->handle == handle)
+        {
+            return ptr;
+        }
+        ptr = smbiosNextPtr(ptr);
+    }
+    return nullptr;
 }
 
 static inline std::string positionToString(uint8_t positionNum,
@@ -414,4 +396,39 @@ static inline std::string positionToString(uint8_t positionNum,
 
     std::string result = target;
     return result;
+}
+
+static inline std::string getObjectPath(
+    const std::string& smbiosInventoryPath,
+    [[maybe_unused]] const std::string& motherboardPath,
+    const std::string& suffix, const unsigned int& index)
+{
+    std::string path = smbiosInventoryPath + suffix + std::to_string(index);
+#ifdef CUSTOM_DBUS_PATH
+    if (!motherboardPath.empty() && path.starts_with(defaultMotherboardPath))
+    {
+        path.replace(0, strlen(defaultMotherboardPath), motherboardPath);
+    }
+#endif
+    return path;
+}
+
+/**
+ * @brief This function takes a string argument representing a file path and, if
+ * the PLATFORM_PREFIX macro is defined, modifies the filename by adding a
+ * platform-specific prefix to it. If the macro is not defined, the function
+ * returns the input path unmodified.
+ * @param path The input file path to decorate.
+ * @return A string representing the decorated file path.
+ */
+inline std::string decorateName(const std::string& path)
+{
+#ifdef PLATFORM_PREFIX
+    std::filesystem::path filepath(path);
+    filepath.replace_filename(
+        std::string(PLATFORM_PREFIX) + "_" + filepath.filename().string());
+    return filepath;
+#else
+    return path;
+#endif
 }

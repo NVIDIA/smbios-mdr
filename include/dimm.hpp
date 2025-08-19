@@ -42,9 +42,10 @@ using EccType =
 using MemoryTechType =
     sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::MemoryTech;
 
-using Json = nlohmann::json;
 using FormFactor =
-    sdbusplus::common::xyz::openbmc_project::inventory::item::Dimm::FormFactor;
+    sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::FormFactor;
+
+using Json = nlohmann::json;
 
 class Dimm :
     sdbusplus::server::object_t<
@@ -119,7 +120,6 @@ class Dimm :
     DeviceType memoryType(DeviceType value) override;
     std::string memoryTypeDetail(std::string value) override;
     uint16_t maxMemorySpeedInMhz(uint16_t value) override;
-    FormFactor formFactor(FormFactor value) override;
     std::string manufacturer(std::string value) override;
     bool present(bool value) override;
     std::string serialNumber(std::string value) override;
@@ -136,6 +136,7 @@ class Dimm :
     uint16_t memoryConfiguredSpeedInMhz(uint16_t value) override;
     bool functional(bool value) override;
     EccType ecc(EccType value) override;
+    FormFactor formFactor(FormFactor value) override;
     Json parseConfigFile();
 
   private:

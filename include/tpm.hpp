@@ -19,7 +19,7 @@
 
 #include <sdbusplus/asio/connection.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
-#include <xyz/openbmc_project/Inventory/Item/Tpm/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/TrustedComponent/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/server.hpp>
 #include <xyz/openbmc_project/Software/Version/server.hpp>
 
@@ -29,15 +29,19 @@ namespace phosphor
 namespace smbios
 {
 
-using tpmIntf = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Inventory::Item::server::Tpm>;
-using assetIntf = sdbusplus::server::object_t<
-    sdbusplus::server::xyz::openbmc_project::inventory::decorator::Asset>;
-using itemIntf = sdbusplus::server::object_t<
-    sdbusplus::server::xyz::openbmc_project::inventory::Item>;
-using softwareversionIntf = sdbusplus::server::object_t<
-    sdbusplus::server::xyz::openbmc_project::software::Version>;
-class Tpm : tpmIntf, assetIntf, itemIntf, softwareversionIntf
+using trustedComponent =
+    sdbusplus::server::xyz::openbmc_project::inventory::item::TrustedComponent;
+using asset =
+    sdbusplus::server::xyz::openbmc_project::inventory::decorator::Asset;
+using Item = sdbusplus::server::xyz::openbmc_project::inventory::Item;
+using softwareversion =
+    sdbusplus::server::xyz::openbmc_project::software::Version;
+
+constexpr uint8_t tpmMajorVerion1 = 0x01;
+constexpr uint8_t tpmMajorVerion2 = 0x02;
+
+class Tpm :
+    sdbusplus::server::object_t<trustedComponent, asset, Item, softwareversion>
 {
   public:
     Tpm() = delete;
@@ -47,23 +51,24 @@ class Tpm : tpmIntf, assetIntf, itemIntf, softwareversionIntf
     Tpm(Tpm&&) = default;
     Tpm& operator=(Tpm&&) = default;
 
-    Tpm(std::shared_ptr<sdbusplus::asio::connection> bus,
-        const std::string& objPath, uint8_t* smbiosTableStorage) :
-        tpmIntf(*bus, objPath.c_str()), assetIntf(*bus, objPath.c_str()),
-        itemIntf(*bus, objPath.c_str()),
-        softwareversionIntf(*bus, objPath.c_str()), path(objPath),
-        storage(smbiosTableStorage)
+    Tpm(sdbusplus::bus_t& bus, const std::string& objPath, const uint8_t tpmID,
+        uint8_t* smbiosTableStorage, const std::string& motherboard) :
+        sdbusplus::server::object_t<trustedComponent, asset, Item,
+                                    softwareversion>(bus, objPath.c_str()),
+        tpmId(tpmID), storage(smbiosTableStorage), motherboardPath(motherboard)
     {
-        tpmInfoUpdate();
+        tpmInfoUpdate(smbiosTableStorage, motherboard);
     }
 
-    void tpmInfoUpdate(void);
+    void tpmInfoUpdate(uint8_t* smbiosTableStorage,
+                       const std::string& motherboard);
 
   private:
-    /** @brief Path of the group instance */
-    std::string path;
+    uint8_t tpmId;
 
     uint8_t* storage;
+
+    std::string motherboardPath;
     struct TPMInfo
     {
         uint8_t type;

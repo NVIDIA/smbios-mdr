@@ -27,29 +27,46 @@ namespace phosphor
 namespace smbios
 {
 
-void Tpm::tpmInfoUpdate(void)
+void Tpm::tpmInfoUpdate(uint8_t* smbiosTableStorage,
+                        const std::string& motherboard)
 {
+    storage = smbiosTableStorage;
+    motherboardPath = motherboard;
+
     uint8_t* dataIn = storage;
     dataIn = getSMBIOSTypePtr(dataIn, tpmDeviceType);
     if (dataIn == nullptr)
     {
         return;
     }
-
+    for (uint8_t index = 0; index < tpmId; index++)
+    {
+        dataIn = smbiosNextPtr(dataIn);
+        if (dataIn == nullptr)
+        {
+            return;
+        }
+        dataIn = getSMBIOSTypePtr(dataIn, tpmDeviceType);
+        if (dataIn == nullptr)
+        {
+            return;
+        }
+    }
     auto tpmInfo = reinterpret_cast<struct TPMInfo*>(dataIn);
 
     present(true);
-    purpose(softwareversionIntf::VersionPurpose::Other);
+    purpose(softwareversion::VersionPurpose::Other);
     tpmVendor(tpmInfo);
     tpmFirmwareVersion(tpmInfo);
     tpmDescription(tpmInfo->description, tpmInfo->length, dataIn);
+    trustedComponentType(trustedComponent::ComponentAttachType::Discrete);
 }
 
 void Tpm::tpmVendor(const struct TPMInfo* tpmInfo)
 {
-    // Specified as four ASCII characters, as defined by TCG Vendor ID
-    char vendorId[5];
     constexpr int vendorIdLength = 4;
+    // Specified as four ASCII characters, as defined by TCG Vendor ID
+    char vendorId[vendorIdLength + 1];
     int i;
     for (i = 0; i < vendorIdLength && tpmInfo->vendor[i] != '\0'; i++)
     {
@@ -69,13 +86,14 @@ void Tpm::tpmVendor(const struct TPMInfo* tpmInfo)
 void Tpm::tpmFirmwareVersion(const struct TPMInfo* tpmInfo)
 {
     std::stringstream stream;
-    if (tpmInfo->specMajor == 0x01)
+
+    if (tpmInfo->specMajor == tpmMajorVerion1)
     {
         auto ver = reinterpret_cast<const struct TPMVersionSpec1*>(
             &tpmInfo->firmwareVersion1);
         stream << ver->revMajor << "." << ver->revMinor;
     }
-    else if (tpmInfo->specMajor == 0x02)
+    else if (tpmInfo->specMajor == tpmMajorVerion2)
     {
         auto ver = reinterpret_cast<const struct TPMVersionSpec2*>(
             &tpmInfo->firmwareVersion1);

@@ -47,8 +47,6 @@ using rev =
     sdbusplus::server::xyz::openbmc_project::inventory::decorator::Revision;
 using asset =
     sdbusplus::server::xyz::openbmc_project::inventory::decorator::Asset;
-using assetTagType =
-    sdbusplus::server::xyz::openbmc_project::inventory::decorator::AssetTag;
 using location =
     sdbusplus::server::xyz::openbmc_project::inventory::decorator::LocationCode;
 using connector =
@@ -63,6 +61,8 @@ using operationalStatus = sdbusplus::xyz::openbmc_project::State::Decorator::
     server::OperationalStatus;
 using instance =
     sdbusplus::server::xyz::openbmc_project::inventory::decorator::Instance;
+using assetTagType =
+    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::AssetTag;
 
 // This table is up to date as of SMBIOS spec DSP0134 3.7.0
 static const std::map<uint8_t, const char*> familyTable = {
@@ -325,9 +325,9 @@ static const std::array<std::optional<processor::Capability>, 16>
         std::nullopt};
 
 class Cpu :
-    sdbusplus::server::object_t<processor, asset, assetTagType, location,
-                                connector, rev, Item, association, instance,
-                                operationalStatus>
+    sdbusplus::server::object_t<processor, asset, location, connector, rev,
+                                Item, association, operationalStatus,
+                                assetTagType, instance, chassis>
 {
   public:
     Cpu() = delete;
@@ -340,9 +340,10 @@ class Cpu :
     Cpu(sdbusplus::bus_t& bus, const std::string& path, const uint8_t& cpuId,
         uint8_t* smbiosTableStorage, const std::string& motherboard,
         std::string& assocPath) :
-        sdbusplus::server::object_t<processor, asset, assetTagType, location,
-                                    connector, rev, Item, association, instance,
-                                    operationalStatus>(bus, path.c_str()),
+        sdbusplus::server::object_t<processor, asset, location, connector, rev,
+                                    Item, association, operationalStatus,
+                                    assetTagType, instance, chassis>(
+            bus, path.c_str()),
         cpuNum(cpuId), storage(smbiosTableStorage),
         motherboardPath(motherboard), objPath(assocPath)
     {
@@ -370,8 +371,8 @@ class Cpu :
     void infoUpdate(uint8_t* smbiosTableStorage,
                     const std::string& motherboard);
 
-    static inline auto
-        socketChipNumber([[maybe_unused]] const std::string socketDesignation)
+    static inline auto socketChipNumber(
+        [[maybe_unused]] const std::string socketDesignation)
     {
         bool found = false;
         size_t socket = 0;
@@ -467,13 +468,13 @@ class Cpu :
                       uint8_t* dataIn);
     void serialNumber(const uint8_t positionNum, const uint8_t structLen,
                       uint8_t* dataIn);
-    void assetTagString(const uint8_t positionNum, const uint8_t structLen,
-                        uint8_t* dataIn);
     void partNumber(const uint8_t positionNum, const uint8_t structLen,
                     uint8_t* dataIn);
     void version(const uint8_t positionNum, const uint8_t structLen,
                  uint8_t* dataIn);
     void characteristics(const uint16_t value);
+    void assetTagString(const uint8_t positionNum, const uint8_t structLen,
+                        uint8_t* dataIn);
 };
 
 } // namespace smbios

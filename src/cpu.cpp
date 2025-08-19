@@ -98,14 +98,6 @@ void Cpu::serialNumber(const uint8_t positionNum, const uint8_t structLen,
     asset::serialNumber(result);
 }
 
-void Cpu::assetTagString(const uint8_t positionNum, const uint8_t structLen,
-                         uint8_t* dataIn)
-{
-    std::string result = positionToString(positionNum, structLen, dataIn);
-
-    assetTagType::assetTag(result);
-}
-
 void Cpu::version(const uint8_t positionNum, const uint8_t structLen,
                   uint8_t* dataIn)
 {
@@ -140,6 +132,13 @@ void Cpu::characteristics(uint16_t value)
     }
 
     processor::characteristics(result);
+}
+
+void Cpu::assetTagString(const uint8_t positionNum, const uint8_t structLen,
+                         uint8_t* dataIn)
+{
+    std::string result = positionToString(positionNum, structLen, dataIn);
+    assetTagType::assetTag(result);
 }
 
 static constexpr uint8_t maxOldVersionCount = 0xff;
