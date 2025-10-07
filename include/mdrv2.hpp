@@ -230,7 +230,6 @@ class MDRV2 :
     std::vector<std::unique_ptr<Tpm>> tpms;
     std::vector<std::unique_ptr<FirmwareInventory>> firmwareCollection;
     std::unique_ptr<System> system;
-    std::unique_ptr<Tpm> tpm;
     std::vector<std::unique_ptr<Baseboard>> baseboards;
     std::shared_ptr<sdbusplus::asio::dbus_interface> smbiosInterface;
     std::unique_ptr<sdbusplus::bus::match_t> interfaceAddedMatch;

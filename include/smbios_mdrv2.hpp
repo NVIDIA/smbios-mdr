@@ -244,6 +244,30 @@ static inline uint8_t* smbiosNextPtr(uint8_t* smbiosDataIn)
     return smbiosData + separateLen;
 }
 
+static inline uint8_t* smbiosSkipEntryPoint(uint8_t* smbiosDataIn)
+{
+    const std::string anchorString30 = "_SM3_";
+    if (smbiosDataIn == nullptr)
+    {
+        return nullptr;
+    }
+
+    // Jump to starting address of the SMBIOS Structure Table from Entry Point
+    auto anchor = reinterpret_cast<const char*>(smbiosDataIn);
+    if (std::string_view(anchor, anchorString30.length())
+            .compare(anchorString30) == 0)
+    {
+        auto epStructure =
+            reinterpret_cast<const EntryPointStructure30*>(smbiosDataIn);
+        if (epStructure->structTableAddr < mdrSMBIOSSize)
+        {
+            smbiosDataIn += epStructure->structTableAddr;
+        }
+    }
+
+    return smbiosDataIn;
+}
+
 // When first time run getSMBIOSTypePtr, need to send the RegionS[].regionData
 // to smbiosDataIn
 static inline uint8_t* getSMBIOSTypePtr(uint8_t* smbiosDataIn, uint8_t typeId,
@@ -253,7 +277,9 @@ static inline uint8_t* getSMBIOSTypePtr(uint8_t* smbiosDataIn, uint8_t typeId,
     {
         return nullptr;
     }
+    smbiosDataIn = smbiosSkipEntryPoint(smbiosDataIn);
     char* smbiosData = reinterpret_cast<char*>(smbiosDataIn);
+
     while ((*smbiosData != '\0') || (*(smbiosData + 1) != '\0'))
     {
         uint32_t len = *(smbiosData + 1);
@@ -284,60 +310,32 @@ static inline uint8_t* getSMBIOSTypePtr(uint8_t* smbiosDataIn, uint8_t typeId,
 }
 
 // Get the nth occurrence of a specific SMBIOS type
-static inline uint8_t* getSMBIOSTypeIndexPtr(uint8_t* smbiosDataIn,
-                                             uint8_t typeId, int index)
+static inline uint8_t* getSMBIOSTypeIndexPtr(
+    uint8_t* smbiosDataIn, uint8_t typeId, uint8_t targetIndex = 0)
 {
-    if (smbiosDataIn == nullptr)
+    uint8_t* dataIn = smbiosDataIn;
+
+    dataIn = getSMBIOSTypePtr(dataIn, typeId);
+    if (dataIn == nullptr)
     {
         return nullptr;
     }
 
-    uint8_t* currentPtr = smbiosDataIn;
-    int currentIndex = 0;
-
-    while (currentPtr != nullptr)
+    for (uint8_t index = 0; index < targetIndex; index++)
     {
-        currentPtr = getSMBIOSTypePtr(currentPtr, typeId);
-        if (currentPtr == nullptr)
+        dataIn = smbiosNextPtr(dataIn);
+        if (dataIn == nullptr)
         {
-            break;
+            return nullptr;
         }
-
-        if (currentIndex == index)
+        dataIn = getSMBIOSTypePtr(dataIn, typeId);
+        if (dataIn == nullptr)
         {
-            return currentPtr;
-        }
-
-        currentIndex++;
-        // Move to next entry to continue searching
-        currentPtr = smbiosNextPtr(currentPtr);
-    }
-
-    return nullptr;
-}
-
-static inline uint8_t* smbiosSkipEntryPoint(uint8_t* smbiosDataIn)
-{
-    const std::string anchorString30 = "_SM3_";
-    if (smbiosDataIn == nullptr)
-    {
-        return nullptr;
-    }
-
-    // Jump to starting address of the SMBIOS Structure Table from Entry Point
-    auto anchor = reinterpret_cast<const char*>(smbiosDataIn);
-    if (std::string_view(anchor, anchorString30.length())
-            .compare(anchorString30) == 0)
-    {
-        auto epStructure =
-            reinterpret_cast<const EntryPointStructure30*>(smbiosDataIn);
-        if (epStructure->structTableAddr < mdrSMBIOSSize)
-        {
-            smbiosDataIn += epStructure->structTableAddr;
+            return nullptr;
         }
     }
 
-    return smbiosDataIn;
+    return dataIn;
 }
 
 static inline uint8_t* smbiosHandlePtr(uint8_t* smbiosDataIn, uint16_t handle)
