@@ -349,10 +349,7 @@ class Cpu :
     {
 #ifndef PLATFORM_PREFIX
 #ifdef CPU_DBUS_CHASSISIFACE
-        chassisIface = std::make_unique<chassis>(bus, path.c_str());
-        // the default value is unknown, set to Component when CPU exists
-        chassisIface->type(chassis::ChassisType::Component);
-        chassisIface->emit_added();
+        chassis::type(chassis::ChassisType::Component);
 #endif
 #else
         static std::vector<std::unique_ptr<chassisCpu>> chassisCpus;
@@ -441,10 +438,6 @@ class Cpu :
     std::string motherboardPath;
 
     std::string objPath;
-
-#ifndef PLATFORM_PREFIX
-    std::unique_ptr<chassis> chassisIface = nullptr;
-#endif
 
     struct ProcessorInfo
     {
