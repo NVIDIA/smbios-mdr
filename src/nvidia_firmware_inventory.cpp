@@ -51,6 +51,13 @@ std::string filterFirmwareName(const std::string& firmwareName)
         return "";
     }
 #endif
+#ifdef FIRMWARE_COMPONENT_NAME_BIOS
+    std::string biosComponentName(FIRMWARE_COMPONENT_NAME_BIOS);
+    if (firmwareName.rfind(biosComponentName) != std::string::npos)
+    {
+        return "";
+    }
+#endif
     return firmwareName;
 }
 } // namespace smbios

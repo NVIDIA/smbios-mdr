@@ -23,5 +23,5 @@ namespace phosphor
 namespace smbios
 {
 std::string filterFirmwareName(const std::string& firmwareName);
-}
+} // namespace smbios
 } // namespace phosphor
