@@ -33,15 +33,11 @@ void Cpu::socket(const uint8_t positionNum, const uint8_t structLen,
 
     location::locationCode(result);
 
-    auto [found, socket, chip] = Cpu::socketChipNumber(result);
-    if (found)
-    {
-        instance::instanceNumber(chip);
-    }
-    else
-    {
-        instance::instanceNumber(cpuNum);
-    }
+    // Use cpuNum as the instance number since it's the unique index of the
+    // CPU entry in the SMBIOS table. The socket designation string parsing
+    // (socketChipNumber) may return the same chip number for multiple CPUs
+    // if the SMBIOS data has duplicate or incorrect socket designations.
+    instance::instanceNumber(cpuNum);
 }
 
 static constexpr uint8_t processorFamily2Indicator = 0xfe;

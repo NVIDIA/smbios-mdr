@@ -50,10 +50,12 @@ using association =
     sdbusplus::server::xyz::openbmc_project::association::Definitions;
 using operationalStatus = sdbusplus::xyz::openbmc_project::State::Decorator::
     server::OperationalStatus;
+using instance =
+    sdbusplus::server::xyz::openbmc_project::inventory::decorator::Instance;
 
 class chassisCpu :
     sdbusplus::server::object_t<asset, assetTagType, location, chassis, Item,
-                                association, operationalStatus>
+                                association, operationalStatus, instance>
 {
   public:
     chassisCpu() = delete;
@@ -66,8 +68,8 @@ class chassisCpu :
                const uint8_t& cpuId, uint8_t* smbiosTableStorage,
                const std::string& motherboard, const std::string& assocPath) :
         sdbusplus::server::object_t<asset, assetTagType, location, chassis,
-                                    Item, association, operationalStatus>(
-            bus, objPath.c_str()),
+                                    Item, association, operationalStatus,
+                                    instance>(bus, objPath.c_str()),
         cpuNum(cpuId), storage(smbiosTableStorage),
         motherboardPath(motherboard), objPath(assocPath)
     {
@@ -75,6 +77,9 @@ class chassisCpu :
 
         // the default value is unknown, set to Component when CPU exists
         chassis::type(chassis::ChassisType::Component);
+
+        // Set instance number based on CPU index
+        instance::instanceNumber(cpuNum);
     }
 
     void infoUpdate(uint8_t* smbiosTableStorage,
