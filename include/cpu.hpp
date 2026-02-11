@@ -324,10 +324,17 @@ static const std::array<std::optional<processor::Capability>, 16>
         std::nullopt,
         std::nullopt};
 
+#ifdef PLATFORM_PREFIX
+class Cpu :
+    sdbusplus::server::object_t<processor, asset, location, connector, rev,
+                                Item, association, operationalStatus,
+                                assetTagType, instance>
+#else
 class Cpu :
     sdbusplus::server::object_t<processor, asset, location, connector, rev,
                                 Item, association, operationalStatus,
                                 assetTagType, instance, chassis>
+#endif
 {
   public:
     Cpu() = delete;
@@ -340,10 +347,16 @@ class Cpu :
     Cpu(sdbusplus::bus_t& bus, const std::string& path, const uint8_t& cpuId,
         uint8_t* smbiosTableStorage, const std::string& motherboard,
         std::string& assocPath) :
+#ifdef PLATFORM_PREFIX
+        sdbusplus::server::object_t<processor, asset, location, connector, rev,
+                                    Item, association, operationalStatus,
+                                    assetTagType, instance>(bus, path.c_str()),
+#else
         sdbusplus::server::object_t<processor, asset, location, connector, rev,
                                     Item, association, operationalStatus,
                                     assetTagType, instance, chassis>(
             bus, path.c_str()),
+#endif
         cpuNum(cpuId), storage(smbiosTableStorage),
         motherboardPath(motherboard), objPath(assocPath)
     {
