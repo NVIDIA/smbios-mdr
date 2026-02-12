@@ -1,4 +1,4 @@
-option('tests', type: 'feature', value: 'disabled', description: 'Build tests')
+option('tests', type: 'feature', value: 'enabled', description: 'Build tests')
 
 option(
     'dimm-dbus',

@@ -245,7 +245,8 @@ void Dimm::dimmDeviceLocator(const uint8_t bankLocatorPositionNum,
     const std::string substrCpu = "CPU";
     auto cpuPos = deviceLocator.find(substrCpu);
 
-    auto data = parseConfigFile();
+    auto data =
+        parseConfigFile(configFilePath.empty() ? filename : configFilePath);
 
     if (!data.empty())
     {
@@ -491,14 +492,14 @@ bool Dimm::functional(bool value)
         OperationalStatus::functional(value);
 }
 
-Json Dimm::parseConfigFile()
+Json Dimm::parseConfigFile(const std::string& path) const
 {
-    std::ifstream memoryLocationFile(filename);
+    std::ifstream memoryLocationFile(path);
 
     if (!memoryLocationFile.is_open())
     {
         lg2::error("config JSON file not found, FILENAME {FILENAME}",
-                   "FILENAME", filename);
+                   "FILENAME", path);
         return {};
     }
 

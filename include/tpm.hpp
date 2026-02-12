@@ -37,8 +37,8 @@ using Item = sdbusplus::server::xyz::openbmc_project::inventory::Item;
 using softwareversion =
     sdbusplus::server::xyz::openbmc_project::software::Version;
 
-constexpr uint8_t tpmMajorVerion1 = 0x01;
-constexpr uint8_t tpmMajorVerion2 = 0x02;
+constexpr uint8_t tpmMajorVersion1 = 0x01;
+constexpr uint8_t tpmMajorVersion2 = 0x02;
 
 class Tpm :
     sdbusplus::server::object_t<trustedComponent, asset, Item, softwareversion>

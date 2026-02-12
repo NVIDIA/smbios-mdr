@@ -77,7 +77,8 @@ class Dimm :
 
     Dimm(sdbusplus::bus_t& bus, const std::string& objPath,
          const uint8_t& dimmId, uint8_t* smbiosTableStorage,
-         const std::string& motherboard) :
+         const std::string& motherboard,
+         const std::string& configFilePath = "") :
 
         sdbusplus::server::object_t<
             sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm>(
@@ -105,7 +106,7 @@ class Dimm :
         sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
                                         state::decorator::OperationalStatus>(
             bus, objPath.c_str()),
-        dimmNum(dimmId)
+        dimmNum(dimmId), configFilePath(configFilePath)
     {
         memoryInfoUpdate(smbiosTableStorage, motherboard);
     }
@@ -137,7 +138,7 @@ class Dimm :
     bool functional(bool value) override;
     EccType ecc(EccType value) override;
     FormFactor formFactor(FormFactor value) override;
-    Json parseConfigFile();
+    Json parseConfigFile(const std::string& path) const;
 
   private:
     uint8_t dimmNum;
@@ -145,6 +146,8 @@ class Dimm :
     uint8_t* storage;
 
     std::string motherboardPath;
+
+    std::string configFilePath;
 
     void dimmSize(const uint16_t size);
     void dimmSizeExt(const uint32_t size);

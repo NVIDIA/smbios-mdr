@@ -87,13 +87,13 @@ void Tpm::tpmFirmwareVersion(const struct TPMInfo* tpmInfo)
 {
     std::stringstream stream;
 
-    if (tpmInfo->specMajor == tpmMajorVerion1)
+    if (tpmInfo->specMajor == tpmMajorVersion1)
     {
         auto ver = reinterpret_cast<const struct TPMVersionSpec1*>(
             &tpmInfo->firmwareVersion1);
         stream << ver->revMajor << "." << ver->revMinor;
     }
-    else if (tpmInfo->specMajor == tpmMajorVerion2)
+    else if (tpmInfo->specMajor == tpmMajorVersion2)
     {
         auto ver = reinterpret_cast<const struct TPMVersionSpec2*>(
             &tpmInfo->firmwareVersion1);

@@ -168,6 +168,12 @@ class MDRV2 :
         std::copy(smbiosTableId.begin(), smbiosTableId.end(),
                   smbiosDir.dir[smbiosDirIndex].common.id.dataInfo);
 
+        smbiosDir.dir[smbiosDirIndex].common.size = 0;
+        smbiosDir.dir[smbiosDirIndex].common.dataSetSize = 0;
+        smbiosDir.dir[smbiosDirIndex].common.dataVersion = 0;
+        smbiosDir.dir[smbiosDirIndex].common.timestamp = 0;
+        smbiosDir.dir[smbiosDirIndex].stage = MDR2SMBIOSStatusEnum::mdr2Loaded;
+        smbiosDir.dir[smbiosDirIndex].lock = MDR2DirLockEnum::mdr2DirUnlock;
         smbiosDir.dir[smbiosDirIndex].dataStorage = smbiosTableStorage;
 
         agentSynchronizeData();

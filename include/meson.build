@@ -41,3 +41,5 @@ if get_option('platform-prefix') != ''
 endif
 
 conf_header = configure_file(output: 'config.h', configuration: conf_data)
+# Include dir for this subdir (source + build so config.h is found)
+include_with_build = include_directories('.')

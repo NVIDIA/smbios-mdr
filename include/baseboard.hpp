@@ -72,7 +72,7 @@ class Baseboard
     Baseboard& operator=(Baseboard&&) = default;
 
     Baseboard(int index, uint8_t* smbiosTableStorage) :
-        storage(smbiosTableStorage), index(index)
+        storage(smbiosTableStorage), index(index), raw(nullptr)
     {
         // Default name
         name = "Board_" + std::to_string(index);
