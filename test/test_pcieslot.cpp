@@ -231,6 +231,18 @@ TEST_F(PcieSlotFixture, PcieInfoUpdateTypeFromLengthFullLength)
     });
 }
 
+TEST_F(PcieSlotFixture, PcieInfoUpdateLaneWidthUnknown)
+{
+    uint8_t storage[256] = {0};
+    setSystemSlot(storage, 0, 1, 0x14, 0xFF, 0x01, 0x04, 0x00, "Slot");
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    EXPECT_NO_THROW({
+        phosphor::smbios::Pcie pcie(
+            *bus, "/xyz/openbmc_project/test/inventory/system/pcieslot0", 0,
+            storage, motherboard);
+    });
+}
+
 TEST_F(PcieSlotFixture, PcieInfoUpdateTypeUnknown)
 {
     uint8_t storage[256] = {0};

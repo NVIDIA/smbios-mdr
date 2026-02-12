@@ -576,3 +576,17 @@ TEST_F(FirmwareInventoryTest, GetFirmwareInventoryDataIndexBeyondAvailable)
         storage, 1, existingPaths);
     EXPECT_TRUE(result.empty());
 }
+
+TEST_F(FirmwareInventoryTest,
+       CheckAndCreateFirmwarePathFallbackWhenIdTrimmedEmpty)
+{
+    uint8_t storage[512] = {0};
+    setupFirmwareInfoStructure(storage, 0, "FW", "v1", "   ", "2024-01-01",
+                               "Mfr");
+    std::vector<std::string> existingPaths;
+    std::string result = FirmwareInventory::checkAndCreateFirmwarePath(
+        storage, 0, existingPaths);
+    EXPECT_FALSE(result.empty());
+    EXPECT_TRUE(result.find("/xyz/openbmc_project/software") !=
+                std::string::npos);
+}

@@ -78,16 +78,32 @@ if get_option('tests').allowed()
     subdir('test')
 endif
 
-# gcovr-based HTML coverage when lcov/geninfo fails (e.g. "mismatched end line" in small GTest bodies).
-# Uses gcovr.cfg in repo root (excludes subprojects/test); optional nvidia filter via openbmc-automation/nvidia-code-coverage/scripts/generate-nvidia-gcovr.sh
+# gcovr-based HTML coverage (same approach as phosphor-post-code-manager, no scripts dir).
 if get_option('b_coverage')
-    _src = meson.project_source_root()
-    _bld = meson.project_build_root()
-    _coveragedir = join_paths(_bld, 'meson-logs', 'coveragereport')
-    run_command('mkdir', '-p', _coveragedir, check: false)
-    # Use wrapper script to remove duplicate .gcda files (same .cpp built in
-    # multiple test executables causes gcov checksum mismatch / exit 5) then
-    # run gcovr. MESON_BUILD_ROOT and MESON_SOURCE_ROOT are set by Meson.
-    _coverage_script = join_paths(_src, 'scripts', 'run-coverage-gcovr.sh')
-    run_target('coverage-gcovr', command: [find_program('sh'), _coverage_script])
+    gcovr = find_program('gcovr', required: false)
+    if gcovr.found()
+        gcovr_config_path = join_paths(meson.project_source_root(), 'gcovr.cfg')
+        coverage_html_dir = join_paths(
+            meson.current_build_dir(),
+            'meson-logs',
+            'coveragereport',
+        )
+        coverage_html_out = join_paths(coverage_html_dir, 'index.html')
+        mkdir = find_program('mkdir')
+        sh = find_program('sh')
+        _cov_cmd = [
+            sh,
+            '-c',
+            '@0@ -p @1@ && @2@ --config @3@ --root @4@ --html --html-details --branch -o @5@ && @2@ --txt-metric branch --print-summary --config @3@ --root @4@'.format(
+                mkdir.path(),
+                coverage_html_dir,
+                gcovr.path(),
+                gcovr_config_path,
+                meson.project_source_root(),
+                coverage_html_out,
+            ),
+        ]
+        run_target('coverage-html-gcovr', command: _cov_cmd)
+        run_target('coverage-gcovr', command: _cov_cmd)
+    endif
 endif

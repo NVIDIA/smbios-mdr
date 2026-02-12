@@ -87,8 +87,9 @@ TEST_F(ChassisCpuTest, ChassisCpuInfoUpdateWithValidData)
 
     storage[50] = 0;
     storage[51] = 0;
+    /* SMBIOS string table: index 1 = first string (no leading null). */
     const char strings[] =
-        "\0CPU Socket 0\0Intel\0Intel(R) Xeon(R) CPU\0SN123\0TAG\0PN123\0\0";
+        "CPU Socket 0\0Intel\0Intel(R) Xeon(R) CPU\0SN123\0TAG\0PN123\0\0";
     std::memcpy(storage + 52, strings, sizeof(strings));
 
     std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
@@ -130,6 +131,26 @@ TEST_F(ChassisCpuTest, ChassisCpuInfoUpdateCpuDisabled)
     storage[0] = processorsType;
     storage[1] = 50;
     storage[24] = 0x40;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath =
+        "/xyz/openbmc_project/test/inventory/system/chassis_cpu0";
+
+    EXPECT_NO_THROW({
+        chassisCpu ccpu(
+            *bus, "/xyz/openbmc_project/test/inventory/system/chassis_cpu0",
+            cpuId, storage, motherboard, assocPath);
+    });
+}
+
+TEST_F(ChassisCpuTest, ChassisCpuInfoUpdateFunctionalFalse)
+{
+    uint8_t cpuId = 0;
+    uint8_t storage[512] = {0};
+
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[24] = 0x40; /* socket populated (bit 6) but (status & 0x07) != 1 */
 
     std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
     std::string assocPath =
@@ -404,7 +425,7 @@ TEST_F(ChassisCpuTest, Constructor_SetsChassisTypeAndInstanceNumber)
     storage[50] = 0;
     storage[51] = 0;
     const char strings[] =
-        "\0CPU Socket 0\0Intel\0Version\0SN123\0TAG\0PN123\0\0";
+        "CPU Socket 0\0Intel\0Version\0SN123\0TAG\0PN123\0\0";
     std::memcpy(storage + 52, strings, sizeof(strings));
 
     std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
@@ -497,7 +518,7 @@ TEST_F(ChassisCpuTest, LocationString_CalledFromInfoUpdate)
     storage[34] = 6;
     storage[50] = 0;
     storage[51] = 0;
-    const char strings[] = "\0MySocket\0Intel\0MyVersion\0SN\0AT\0PN\0\0";
+    const char strings[] = "MySocket\0Intel\0MyVersion\0SN\0AT\0PN\0\0";
     std::memcpy(storage + 52, strings, sizeof(strings));
 
     std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
@@ -526,7 +547,7 @@ TEST_F(ChassisCpuTest, Manufacturer_CalledFromInfoUpdate)
     storage[34] = 6;
     storage[50] = 0;
     storage[51] = 0;
-    const char strings[] = "\0Socket\0AMD\0Version\0Serial\0Tag\0PartNum\0\0";
+    const char strings[] = "Socket\0AMD\0Version\0Serial\0Tag\0PartNum\0\0";
     std::memcpy(storage + 52, strings, sizeof(strings));
 
     std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
@@ -555,7 +576,7 @@ TEST_F(ChassisCpuTest, Model_CalledFromInfoUpdate)
     storage[34] = 6;
     storage[50] = 0;
     storage[51] = 0;
-    const char strings[] = "\0Socket\0Vendor\0ModelString\0SN\0Tag\0PN\0\0";
+    const char strings[] = "Socket\0Vendor\0ModelString\0SN\0Tag\0PN\0\0";
     std::memcpy(storage + 52, strings, sizeof(strings));
 
     std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
@@ -584,7 +605,7 @@ TEST_F(ChassisCpuTest, SerialNumber_CalledFromInfoUpdate)
     storage[34] = 6;
     storage[50] = 0;
     storage[51] = 0;
-    const char strings[] = "\0Socket\0Vendor\0Version\0MY_SERIAL\0Tag\0PN\0\0";
+    const char strings[] = "Socket\0Vendor\0Version\0MY_SERIAL\0Tag\0PN\0\0";
     std::memcpy(storage + 52, strings, sizeof(strings));
 
     std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
@@ -613,7 +634,7 @@ TEST_F(ChassisCpuTest, AssetTagString_CalledFromInfoUpdate)
     storage[34] = 6;
     storage[50] = 0;
     storage[51] = 0;
-    const char strings[] = "\0Socket\0Vendor\0Version\0SN\0ASSET_TAG\0PN\0\0";
+    const char strings[] = "Socket\0Vendor\0Version\0SN\0ASSET_TAG\0PN\0\0";
     std::memcpy(storage + 52, strings, sizeof(strings));
 
     std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
@@ -642,7 +663,7 @@ TEST_F(ChassisCpuTest, PartNumber_CalledFromInfoUpdate)
     storage[34] = 6;
     storage[50] = 0;
     storage[51] = 0;
-    const char strings[] = "\0Socket\0Vendor\0Version\0SN\0Tag\0PART_NUM\0\0";
+    const char strings[] = "Socket\0Vendor\0Version\0SN\0Tag\0PART_NUM\0\0";
     std::memcpy(storage + 52, strings, sizeof(strings));
 
     std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
@@ -671,7 +692,7 @@ TEST_F(ChassisCpuTest, InfoUpdate_NonEmptyMotherboard_SetsAssociations)
     storage[34] = 6;
     storage[50] = 0;
     storage[51] = 0;
-    const char strings[] = "\0Socket\0Vendor\0Version\0SN\0Tag\0PN\0\0";
+    const char strings[] = "Socket\0Vendor\0Version\0SN\0Tag\0PN\0\0";
     std::memcpy(storage + 52, strings, sizeof(strings));
 
     std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
@@ -700,7 +721,7 @@ TEST_F(ChassisCpuTest, InfoUpdate_SocketPopulated_FunctionalTrue)
     storage[34] = 6;
     storage[50] = 0;
     storage[51] = 0;
-    const char strings[] = "\0Socket\0Vendor\0Version\0SN\0Tag\0PN\0\0";
+    const char strings[] = "Socket\0Vendor\0Version\0SN\0Tag\0PN\0\0";
     std::memcpy(storage + 52, strings, sizeof(strings));
 
     std::string motherboard = "/xyz/openbmc_project/test/inventory/system";

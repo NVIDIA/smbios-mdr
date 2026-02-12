@@ -294,6 +294,246 @@ TEST_F(CpuTest, InfoUpdateFamily2Known)
     });
 }
 
+TEST_F(CpuTest, InfoUpdateFamily2FromTable)
+{
+    uint8_t cpuId = 0;
+    uint8_t storage[512] = {0};
+
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[6] = 0xFE;  /* Processor Family 2 Indicator */
+    storage[24] = 0x41;
+    storage[40] = 0x00; /* family2 = 0x0100 (ARMv7) - in family2Table */
+    storage[41] = 0x01;
+    storage[50] = 0;
+    storage[51] = 0;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath = "/xyz/openbmc_project/test/inventory/system/cpu0";
+
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus, "/xyz/openbmc_project/test/inventory/system/cpu0", cpuId,
+                storage, motherboard, assocPath);
+    });
+}
+
+TEST_F(CpuTest, InfoUpdateFamilyUnknown)
+{
+    uint8_t cpuId = 0;
+    uint8_t storage[512] = {0};
+
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[6] = 0xFD; /* not in familyTable -> "Unknown Processor Family" */
+    storage[24] = 0x41;
+    storage[50] = 0;
+    storage[51] = 0;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath = "/xyz/openbmc_project/test/inventory/system/cpu0";
+
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus, "/xyz/openbmc_project/test/inventory/system/cpu0", cpuId,
+                storage, motherboard, assocPath);
+    });
+}
+
+TEST_F(CpuTest, InfoUpdateFunctionalFalse)
+{
+    uint8_t cpuId = 0;
+    uint8_t storage[512] = {0};
+
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[6] = 0x0B;
+    storage[24] = 0x40; /* socket populated (bit 6) but (status & 0x07) != 1 */
+    storage[50] = 0;
+    storage[51] = 0;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath = "/xyz/openbmc_project/test/inventory/system/cpu0";
+
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus, "/xyz/openbmc_project/test/inventory/system/cpu0", cpuId,
+                storage, motherboard, assocPath);
+    });
+}
+
+TEST_F(CpuTest, InfoUpdateCoreCountFromExtended)
+{
+    uint8_t cpuId = 0;
+    uint8_t storage[512] = {0};
+
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[6] = 0x0B;
+    storage[24] = 0x41;
+    storage[35] = 0xFF; /* coreCount >= 0xff -> use coreCount2 */
+    storage[42] = 16;
+    storage[43] = 0;
+    storage[50] = 0;
+    storage[51] = 0;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath = "/xyz/openbmc_project/test/inventory/system/cpu0";
+
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus, "/xyz/openbmc_project/test/inventory/system/cpu0", cpuId,
+                storage, motherboard, assocPath);
+    });
+}
+
+TEST_F(CpuTest, InfoUpdateCharacteristicsWithCapability)
+{
+    uint8_t cpuId = 0;
+    uint8_t storage[512] = {0};
+
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[6] = 0x0B;
+    storage[24] = 0x41;
+    storage[38] = 0x04; /* bit 2 set -> Capable64bit in characteristicsTable */
+    storage[39] = 0x00;
+    storage[50] = 0;
+    storage[51] = 0;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath = "/xyz/openbmc_project/test/inventory/system/cpu0";
+
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus, "/xyz/openbmc_project/test/inventory/system/cpu0", cpuId,
+                storage, motherboard, assocPath);
+    });
+}
+
+TEST_F(CpuTest, InfoUpdateCoreAndThreadNonExtended)
+{
+    uint8_t cpuId = 0;
+    uint8_t storage[512] = {0};
+
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[6] = 0x0B;
+    storage[24] = 0x41;
+    storage[35] = 4; /* coreCount < 0xFF -> use coreCount path */
+    storage[37] = 8; /* threadCount < 0xFF -> use threadCount path */
+    storage[50] = 0;
+    storage[51] = 0;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath = "/xyz/openbmc_project/test/inventory/system/cpu0";
+
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus, "/xyz/openbmc_project/test/inventory/system/cpu0", cpuId,
+                storage, motherboard, assocPath);
+    });
+}
+
+TEST_F(CpuTest, InfoUpdateIntelFamilyIdCpuFamily6)
+{
+    /* family 0x0B = "Intel Pentium processor" (has " Intel ") ->
+     * step/effectiveFamily/effectiveModel */
+    uint8_t cpuId = 0;
+    uint8_t storage[512] = {0};
+
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[6] = 0x0B;
+    storage[24] = 0x41;
+    storage[8] = 0x21; /* id: step=1, model=2, family from [9] */
+    storage[9] = 0x06; /* cpuFamily=0x6 -> effectiveFamily(cpuFamily),
+                          effectiveModel((xModel<<4)|model) */
+    storage[10] = 0;
+    storage[11] = 0;
+    storage[50] = 0;
+    storage[51] = 0;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath = "/xyz/openbmc_project/test/inventory/system/cpu0";
+
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus, "/xyz/openbmc_project/test/inventory/system/cpu0", cpuId,
+                storage, motherboard, assocPath);
+    });
+}
+
+TEST_F(CpuTest, InfoUpdateIntelFamilyIdCpuFamilyF)
+{
+    /* family 0x0B = "Intel Pentium processor"; id with cpuFamily=0xf */
+    uint8_t cpuId = 0;
+    uint8_t storage[512] = {0};
+
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[6] = 0x0B;
+    storage[24] = 0x41;
+    storage[8] = 0x00;
+    storage[9] =
+        0x0f; /* cpuFamily=0xf -> effectiveFamily(cpuXFamily+cpuFamily) */
+    storage[10] = 0;
+    storage[11] = 0;
+    storage[12] = 0x01; /* cpuXFamily for effectiveFamily */
+    storage[50] = 0;
+    storage[51] = 0;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath = "/xyz/openbmc_project/test/inventory/system/cpu0";
+
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus, "/xyz/openbmc_project/test/inventory/system/cpu0", cpuId,
+                storage, motherboard, assocPath);
+    });
+}
+
+TEST_F(CpuTest, InfoUpdateIntelFamilyIdEffectiveModelElse)
+{
+    /* family in table with " Intel "; cpuFamily neither 0x6 nor 0xf ->
+     * effectiveModel(cpuModel) */
+    uint8_t cpuId = 0;
+    uint8_t storage[512] = {0};
+
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[6] = 0x0B;
+    storage[24] = 0x41;
+    storage[8] = 0x53; /* step=3, model=5 */
+    storage[9] = 0x01; /* cpuFamily=0x1 -> else effectiveModel(cpuModel) */
+    storage[50] = 0;
+    storage[51] = 0;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath = "/xyz/openbmc_project/test/inventory/system/cpu0";
+
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus, "/xyz/openbmc_project/test/inventory/system/cpu0", cpuId,
+                storage, motherboard, assocPath);
+    });
+}
+
+TEST_F(CpuTest, InfoUpdateThreadCountFromExtended)
+{
+    uint8_t cpuId = 0;
+    uint8_t storage[512] = {0};
+
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[6] = 0x0B;
+    storage[24] = 0x41;
+    storage[37] = 0xFF; /* threadCount >= 0xff -> use threadCount2 */
+    storage[46] = 32;
+    storage[47] = 0;
+    storage[50] = 0;
+    storage[51] = 0;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath = "/xyz/openbmc_project/test/inventory/system/cpu0";
+
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus, "/xyz/openbmc_project/test/inventory/system/cpu0", cpuId,
+                storage, motherboard, assocPath);
+    });
+}
+
 TEST_F(CpuTest, InfoUpdateCpuIdFamilyNotF)
 {
     uint8_t cpuId = 0;

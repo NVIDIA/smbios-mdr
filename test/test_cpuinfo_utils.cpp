@@ -196,6 +196,14 @@ TEST(CpuinfoUtilsCpp, UpdateOsStateInvalidEnumFallsBackToInactive)
     EXPECT_EQ(hostState, HostState::postInProgress);
 }
 
+TEST(CpuinfoUtilsCpp, UpdateOsStateEmptyStringPrependThenInvalidEnum)
+{
+    updatePowerState("xyz.openbmc_project.State.Host.HostState.Running");
+    updateBiosDone(false);
+    updateOsState("");
+    EXPECT_EQ(hostState, HostState::postInProgress);
+}
+
 TEST(CpuinfoUtilsCpp, StateChangeInvokesCallbacks)
 {
     static HostState oldSeen = HostState::off, newSeen = HostState::off;
@@ -306,25 +314,3 @@ TEST(CpuinfoUtilsCpp, UpdateOsStateRomBootAndCdromBoot)
 }
 
 } // namespace cpu_info
-
-#ifdef PHOSPHOR_SMBIOS_MDR_UNIT_TEST
-class CpuinfoUtilsTestEnv : public ::testing::Environment
-{
-  public:
-    void TearDown() override
-    {
-        cpu_info::dbus::resetConnectionForTest();
-    }
-};
-
-int main(int argc, char** argv)
-{
-    ::testing::InitGoogleTest(&argc, argv);
-    ::testing::AddGlobalTestEnvironment(new CpuinfoUtilsTestEnv);
-    int ret = RUN_ALL_TESTS();
-    /* Destroy connection before static destructors so Valgrind sees no
-     * use-after-free */
-    cpu_info::dbus::resetConnectionForTest();
-    return ret;
-}
-#endif

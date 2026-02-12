@@ -91,9 +91,6 @@ namespace dbus
 {
 boost::asio::io_context& getIOContext();
 std::shared_ptr<sdbusplus::asio::connection> getConnection();
-#ifdef PHOSPHOR_SMBIOS_MDR_UNIT_TEST
-void resetConnectionForTest();
-#endif
 } // namespace dbus
 
 } // namespace cpu_info

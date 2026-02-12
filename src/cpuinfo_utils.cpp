@@ -309,29 +309,11 @@ boost::asio::io_context& getIOContext()
     static boost::asio::io_context ioc;
     return ioc;
 }
-#ifdef PHOSPHOR_SMBIOS_MDR_UNIT_TEST
-static std::shared_ptr<sdbusplus::asio::connection> g_connection;
-void resetConnectionForTest()
-{
-    dbusConn.reset();
-    g_connection.reset();
-}
-std::shared_ptr<sdbusplus::asio::connection> getConnection()
-{
-    if (!g_connection)
-    {
-        g_connection =
-            std::make_shared<sdbusplus::asio::connection>(getIOContext());
-    }
-    return g_connection;
-}
-#else
 std::shared_ptr<sdbusplus::asio::connection> getConnection()
 {
     static auto conn =
         std::make_shared<sdbusplus::asio::connection>(getIOContext());
     return conn;
 }
-#endif
 } // namespace dbus
 } // namespace cpu_info

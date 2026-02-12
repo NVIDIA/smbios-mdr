@@ -203,6 +203,35 @@ TEST_F(TpmTest, TpmInfoUpdateNonPrintableVendorID)
     });
 }
 
+TEST_F(TpmTest, TpmInfoUpdateVendorMultipleNonPrintableReplacedWithDot)
+{
+    uint8_t tpmID = 0;
+    uint8_t storage[512] = {0};
+
+    storage[0] = tpmDeviceType;
+    storage[1] = 0x1C;
+    storage[4] = 0x7F; /* non-printable -> '.' */
+    storage[5] = 0x00; /* non-printable -> '.' */
+    storage[6] = 'T';
+    storage[7] = 'C';
+    storage[8] = 0x02;
+    storage[9] = 0x00;
+    storage[10] = 0x01;
+    storage[11] = 0x00;
+    storage[12] = 0x01;
+    storage[13] = 0x00;
+    storage[18] = 1;
+    storage[0x1C] = 0;
+    storage[0x1D] = 0;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    EXPECT_NO_THROW({
+        Tpm tpm(*bus, "/xyz/openbmc_project/test/inventory/system/tpm0", tpmID,
+                storage, motherboard);
+    });
+}
+
 TEST_F(TpmTest, TpmInfoUpdateEmptyMotherboard)
 {
     uint8_t tpmID = 0;
@@ -637,6 +666,32 @@ TEST_F(TpmTest, TpmFirmwareVersionSpec2Format)
     storage[11] = 0x00;
     storage[12] = 0x01;
     storage[13] = 0x00;
+    storage[18] = 0;
+    storage[0x1C] = 0;
+    storage[0x1D] = 0;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    EXPECT_NO_THROW({
+        Tpm tpm(*bus, "/xyz/openbmc_project/test/inventory/system/tpm0", tpmID,
+                storage, motherboard);
+    });
+}
+
+TEST_F(TpmTest, TpmFirmwareVersionSpecUnknown)
+{
+    uint8_t tpmID = 0;
+    uint8_t storage[512] = {0};
+
+    storage[0] = tpmDeviceType;
+    storage[1] = 0x1C;
+    storage[4] = 'I';
+    storage[5] = 'N';
+    storage[6] = 'T';
+    storage[7] = 'C';
+    storage[8] =
+        0; /* specMajor neither tpmMajorVersion1 nor tpmMajorVersion2 */
+    storage[9] = 0x00;
     storage[18] = 0;
     storage[0x1C] = 0;
     storage[0x1D] = 0;

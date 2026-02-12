@@ -19,8 +19,11 @@
 #include "system.hpp"
 #include "test_mock_helpers.hpp"
 
+#include <unistd.h>
+
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 
 #include <gmock/gmock.h>
@@ -278,6 +281,34 @@ TEST_F(SystemTest, VersionWithFileOperationFailure)
 
     std::string result = system.version("");
     EXPECT_TRUE(result == "No BIOS Version" || result.empty());
+}
+
+TEST_F(SystemTest, VersionNonPrintableWithWritableDirTruncatesFile)
+{
+    uint8_t storage[512] = {0};
+
+    storage[0] = biosType;
+    storage[1] = 24;
+    storage[4] = 1;
+    storage[5] = 2;
+    storage[24] = 0;
+    storage[25] = 0;
+
+    const char strings[] = "Vendor\0v1.0\x01\0Date\0\0";
+    std::memcpy(storage + 26, strings, sizeof(strings));
+
+    std::string tmpDir = std::filesystem::temp_directory_path().string() +
+                         "/smbios_mdr_test_" + std::to_string(getpid());
+    std::filesystem::create_directories(tmpDir);
+    std::string writablePath = tmpDir + "/smbios2";
+
+    System system(conn, "/xyz/openbmc_project/test/inventory/system", storage,
+                  writablePath);
+
+    std::string result = system.version("");
+    EXPECT_TRUE(result == "No BIOS Version" || result.empty());
+
+    std::filesystem::remove_all(tmpDir);
 }
 
 TEST_F(SystemTest, UuidWithValidSystemInfo)

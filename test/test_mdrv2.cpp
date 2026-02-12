@@ -340,6 +340,27 @@ TEST_F(Mdrv2Fixture, StubFileSendDataInformationUnchangedReturnsFalse)
     std::remove(path.c_str());
 }
 
+TEST_F(Mdrv2Fixture, StubFileSendDataInformationSingleFieldChanges)
+{
+    std::string path = "/tmp/smbios2_mdrv2_test_" + std::to_string(getpid());
+    ASSERT_TRUE(writeMinimalSmbiosStub(path)) << "write stub to " << path;
+
+    auto objServer = std::make_shared<sdbusplus::asio::object_server>(conn);
+    phosphor::smbios::MDRV2 mdr(io, conn, objServer, path,
+                                phosphor::smbios::defaultObjectPath,
+                                phosphor::smbios::defaultInventoryPath);
+
+    mdr.sendDataInformation(0, 0, 24, 1, 0);
+    bool changedLen = mdr.sendDataInformation(0, 0, 25, 1, 0);
+    EXPECT_TRUE(changedLen);
+    bool changedVer = mdr.sendDataInformation(0, 0, 25, 2, 0);
+    EXPECT_TRUE(changedVer);
+    bool changedTs = mdr.sendDataInformation(0, 0, 25, 2, 1);
+    EXPECT_TRUE(changedTs);
+
+    std::remove(path.c_str());
+}
+
 TEST_F(Mdrv2Fixture, BadFileTooSmallConstructorCompletesReadFails)
 {
     std::string path =
@@ -534,16 +555,23 @@ TEST_F(Mdrv2Fixture, GetDataInformationInvalidIndexThrows)
                                 phosphor::smbios::defaultObjectPath,
                                 phosphor::smbios::defaultInventoryPath);
     EXPECT_THROW(mdr.getDataInformation(maxDirEntries), Mdrv2InvalidParameter);
+    EXPECT_THROW(mdr.getDataInformation(maxDirEntries + 1),
+                 Mdrv2InvalidParameter);
 }
 
 TEST_F(Mdrv2Fixture, GetDataOfferReturnsOfferWhenAvailForUpdate)
 {
+    std::string path = "/tmp/smbios2_mdrv2_test_" + std::to_string(getpid());
+    ASSERT_TRUE(writeMinimalSmbiosStub(path)) << "write stub to " << path;
+
     auto objServer = std::make_shared<sdbusplus::asio::object_server>(conn);
-    phosphor::smbios::MDRV2 mdr(io, conn, objServer, "/nonexistent/smbios2",
+    phosphor::smbios::MDRV2 mdr(io, conn, objServer, path,
                                 phosphor::smbios::defaultObjectPath,
                                 phosphor::smbios::defaultInventoryPath);
     std::vector<uint8_t> offer = mdr.getDataOffer();
     EXPECT_EQ(offer.size(), 16u);
+
+    std::remove(path.c_str());
 }
 
 TEST_F(Mdrv2Fixture, SendDirectoryInformationInvalidDirIndexThrows)
@@ -663,10 +691,27 @@ TEST_F(Mdrv2Fixture, SynchronizeDirectoryCommonDataReturnsThreeValues)
 
 TEST_F(Mdrv2Fixture, GetDataInformationReturnsInfoForValidIndex)
 {
+    std::string path = "/tmp/smbios2_mdrv2_test_" + std::to_string(getpid());
+    ASSERT_TRUE(writeMinimalSmbiosStub(path)) << "write stub to " << path;
+
     auto objServer = std::make_shared<sdbusplus::asio::object_server>(conn);
-    phosphor::smbios::MDRV2 mdr(io, conn, objServer, "/nonexistent/smbios2",
+    phosphor::smbios::MDRV2 mdr(io, conn, objServer, path,
                                 phosphor::smbios::defaultObjectPath,
                                 phosphor::smbios::defaultInventoryPath);
     std::vector<uint8_t> info = mdr.getDataInformation(0);
     EXPECT_GE(info.size(), 5u);
+
+    std::remove(path.c_str());
+}
+
+TEST_F(Mdrv2Fixture, SendDirectoryInformationSameVersionTerminatesTrue)
+{
+    auto objServer = std::make_shared<sdbusplus::asio::object_server>(conn);
+    phosphor::smbios::MDRV2 mdr(io, conn, objServer, "/nonexistent/smbios2",
+                                phosphor::smbios::defaultObjectPath,
+                                phosphor::smbios::defaultInventoryPath);
+    std::vector<uint8_t> entry(16, 0);
+    bool terminate =
+        mdr.sendDirectoryInformation(smbiosDirVersion, 0, 1, 0, entry);
+    EXPECT_TRUE(terminate);
 }

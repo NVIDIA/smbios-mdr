@@ -211,6 +211,26 @@ TEST_F(DimmTest, UpdateEccTypeType16MatchingHandleSetsEccFromMap)
     });
 }
 
+TEST_F(DimmTest, MemoryInfoUpdateSizeMaxOldUsesExtendedSize)
+{
+    uint8_t dimmId = 0;
+    auto smbiosData = createSMBIOSMemoryDevice(0);
+    uint8_t storage[2048] = {0};
+    std::memcpy(storage, smbiosData.data(),
+                std::min(smbiosData.size(), sizeof(storage)));
+
+    auto* memInfo = reinterpret_cast<MemoryInfo*>(storage);
+    memInfo->size = 0x7fff; /* maxOldDimmSize -> dimmSizeExt branch */
+    memInfo->extendedSize = 32768;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0",
+                  dimmId, storage, motherboard);
+    });
+}
+
 TEST_F(DimmTest, MemoryInfoUpdateExtendedSize)
 {
     uint8_t dimmId = 0;
@@ -241,6 +261,152 @@ TEST_F(DimmTest, MemoryInfoUpdateSizeZero)
 
     auto* memInfo = reinterpret_cast<MemoryInfo*>(storage);
     memInfo->size = 0;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0",
+                  dimmId, storage, motherboard);
+    });
+}
+
+TEST_F(DimmTest, MemoryInfoUpdateFormFactorKeyNotInMapUsesRDIMM)
+{
+    uint8_t dimmId = 0;
+    auto smbiosData = createSMBIOSMemoryDevice(0);
+    uint8_t storage[2048] = {0};
+    std::memcpy(storage, smbiosData.data(),
+                std::min(smbiosData.size(), sizeof(storage)));
+
+    auto* memInfo = reinterpret_cast<MemoryInfo*>(storage);
+    memInfo->formFactor =
+        0xFF; /* not in dimmFormFactorMap -> defaults to RDIMM */
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0",
+                  dimmId, storage, motherboard);
+    });
+}
+
+TEST_F(DimmTest, MemoryInfoUpdateDimmSizeNewVersionEncoding)
+{
+    uint8_t dimmId = 0;
+    auto smbiosData = createSMBIOSMemoryDevice(0);
+    uint8_t storage[2048] = {0};
+    std::memcpy(storage, smbiosData.data(),
+                std::min(smbiosData.size(), sizeof(storage)));
+
+    auto* memInfo = reinterpret_cast<MemoryInfo*>(storage);
+    /* size with bit 0x8000 set: uses else branch (no * 1024) in dimmSize() */
+    memInfo->size = 0x8001;
+    memInfo->extendedSize = 0;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0",
+                  dimmId, storage, motherboard);
+    });
+}
+
+TEST_F(DimmTest, MemoryInfoUpdateMemoryTypeUnknown)
+{
+    uint8_t dimmId = 0;
+    auto smbiosData = createSMBIOSMemoryDevice(0);
+    uint8_t storage[2048] = {0};
+    std::memcpy(storage, smbiosData.data(),
+                std::min(smbiosData.size(), sizeof(storage)));
+
+    auto* memInfo = reinterpret_cast<MemoryInfo*>(storage);
+    memInfo->memoryType = 0xFF;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0",
+                  dimmId, storage, motherboard);
+    });
+}
+
+TEST_F(DimmTest, MemoryInfoUpdateMemoryTechnologyUnknown)
+{
+    uint8_t dimmId = 0;
+    auto smbiosData = createSMBIOSMemoryDevice(0);
+    uint8_t storage[2048] = {0};
+    std::memcpy(storage, smbiosData.data(),
+                std::min(smbiosData.size(), sizeof(storage)));
+
+    auto* memInfo = reinterpret_cast<MemoryInfo*>(storage);
+    memInfo->memoryTechnology =
+        0xFF; /* not in dimmMemoryTechTypeMap -> MemoryTechType::Unknown */
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0",
+                  dimmId, storage, motherboard);
+    });
+}
+
+TEST_F(DimmTest, MemoryInfoUpdateTypeDetailMultipleBits)
+{
+    uint8_t dimmId = 0;
+    auto smbiosData = createSMBIOSMemoryDevice(0);
+    uint8_t storage[2048] = {0};
+    std::memcpy(storage, smbiosData.data(),
+                std::min(smbiosData.size(), sizeof(storage)));
+
+    auto* memInfo = reinterpret_cast<MemoryInfo*>(storage);
+    memInfo->typeDetail = 0x0003; /* multiple bits set -> dimmTypeDetail loop */
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0",
+                  dimmId, storage, motherboard);
+    });
+}
+
+TEST_F(DimmTest, MemoryInfoUpdateDeviceLocatorCpuAndDimmFallbackNoConfig)
+{
+    uint8_t dimmId = 0;
+    auto smbiosData = createSMBIOSMemoryDevice(0);
+    uint8_t storage[2048] = {0};
+    std::memcpy(storage, smbiosData.data(),
+                std::min(smbiosData.size(), sizeof(storage)));
+    auto* memInfo = reinterpret_cast<MemoryInfo*>(storage);
+    memInfo->deviceLocator = 1; /* SMBIOS string 1 = "CPU0" */
+    memInfo->bankLocator = 2;   /* SMBIOS string 2 = "DIMM_A" */
+    /* Overwrite string table: pos 1 "CPU0", pos 2 "DIMM_A", then rest */
+    uint8_t* strStart = storage + sizeof(MemoryInfo);
+    const char newStrings[] =
+        "\0CPU0\0DIMM_A\0Manufacturer\0SN123\0TAG\0PN123\0\0";
+    std::memcpy(strStart, newStrings, sizeof(newStrings));
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0",
+                  dimmId, storage, motherboard);
+    });
+}
+
+TEST_F(DimmTest, MemoryInfoUpdateDeviceLocatorBankPlusDeviceSingleLetterSlot)
+{
+    uint8_t dimmId = 0;
+    auto smbiosData = createSMBIOSMemoryDevice(0);
+    uint8_t storage[2048] = {0};
+    std::memcpy(storage, smbiosData.data(),
+                std::min(smbiosData.size(), sizeof(storage)));
+    auto* memInfo = reinterpret_cast<MemoryInfo*>(storage);
+    memInfo->deviceLocator = 1;
+    memInfo->bankLocator = 2;
+    uint8_t* strStart = storage + sizeof(MemoryInfo);
+    const char newStrings[] =
+        "\0DIMM_C\0BANK1\0Manufacturer\0SN123\0TAG\0PN123\0\0";
+    std::memcpy(strStart, newStrings, sizeof(newStrings));
 
     std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
 
@@ -556,7 +722,6 @@ TEST_F(DimmTest, DeviceLocatorOnlyDimmLocationCode)
     strStart += deviceLoc.length() + 1;
     std::string bankLoc = "";
     std::memcpy(strStart, bankLoc.c_str(), bankLoc.length());
-    strStart += bankLoc.length() + 1;
     memInfo->deviceLocator = 1;
     memInfo->bankLocator = 2;
 
@@ -579,7 +744,6 @@ TEST_F(DimmTest, DeviceLocatorWithConfigFile)
     strStart += deviceLoc.length() + 1;
     std::string bankLoc = "BANK0";
     std::memcpy(strStart, bankLoc.c_str(), bankLoc.length());
-    strStart += bankLoc.length() + 1;
     memInfo->deviceLocator = 1;
     memInfo->bankLocator = 2;
 
@@ -602,7 +766,6 @@ TEST_F(DimmTest, DeviceLocatorNoCpuNoConfig)
     strStart += deviceLoc.length() + 1;
     std::string bankLoc = "BANK0";
     std::memcpy(strStart, bankLoc.c_str(), bankLoc.length());
-    strStart += bankLoc.length() + 1;
     memInfo->deviceLocator = 1;
     memInfo->bankLocator = 2;
 
@@ -625,7 +788,6 @@ TEST_F(DimmTest, DeviceLocatorDimmNotSingleLetter)
     strStart += deviceLoc.length() + 1;
     std::string bankLoc = "BANK0";
     std::memcpy(strStart, bankLoc.c_str(), bankLoc.length());
-    strStart += bankLoc.length() + 1;
     memInfo->deviceLocator = 1;
     memInfo->bankLocator = 2;
 
@@ -732,7 +894,6 @@ TEST_F(DimmTest, DeviceLocatorWithBankLocator)
     strStart += deviceLoc.length() + 1;
     std::string bankLoc = "BANK0";
     std::memcpy(strStart, bankLoc.c_str(), bankLoc.length());
-    strStart += bankLoc.length() + 1;
     memInfo->deviceLocator = 1;
     memInfo->bankLocator = 2;
 
@@ -755,7 +916,6 @@ TEST_F(DimmTest, DeviceLocatorWithCpuString)
     strStart += deviceLoc.length() + 1;
     std::string bankLoc = "";
     std::memcpy(strStart, bankLoc.c_str(), bankLoc.length());
-    strStart += bankLoc.length() + 1;
     memInfo->deviceLocator = 1;
     memInfo->bankLocator = 2;
 
@@ -778,7 +938,6 @@ TEST_F(DimmTest, DeviceLocatorCpuStringInvalidNumber)
     strStart += deviceLoc.length() + 1;
     std::string bankLoc = "";
     std::memcpy(strStart, bankLoc.c_str(), bankLoc.length());
-    strStart += bankLoc.length() + 1;
     memInfo->deviceLocator = 1;
     memInfo->bankLocator = 2;
 
@@ -803,7 +962,6 @@ TEST_F(DimmTest, DeviceLocatorDimmSingleLetter)
     strStart += deviceLoc.length() + 1;
     std::string bankLoc = "";
     std::memcpy(strStart, bankLoc.c_str(), bankLoc.length());
-    strStart += bankLoc.length() + 1;
     memInfo->deviceLocator = 1;
     memInfo->bankLocator = 2;
 
