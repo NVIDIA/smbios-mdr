@@ -693,11 +693,7 @@ void MDRV2::systemInfoUpdate()
             }
         }
 
-#ifndef PLATFORM_PREFIX
-        std::string path(defaultMotherboardPath);
-#else
         std::string path(dimmPath);
-#endif
         path += "/" + objName;
         dimms.emplace_back(std::make_unique<phosphor::smbios::Dimm>(
             *bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
