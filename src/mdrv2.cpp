@@ -385,6 +385,13 @@ uint8_t MDRV2::directoryEntries(uint8_t value)
 
 void MDRV2::systemInfoUpdate()
 {
+#ifndef PUBLISH_INVENTORY
+    // Inventory publication disabled at build time. Records are still
+    // received/persisted and served via xyz.openbmc_project.Smbios.MDR_V2,
+    // but no inventory objects are created under
+    // /xyz/openbmc_project/inventory. Another service owns that subtree.
+    return;
+#else
     // By default, look for System interface on any system/board/* object
     std::string mapperAncestorPath = smbiosInventoryPath;
     std::string matchParentPath = smbiosInventoryPath + "/board/";
@@ -800,6 +807,7 @@ void MDRV2::systemInfoUpdate()
     system = std::make_unique<System>(bus, smbiosInventoryPath + systemSuffix,
                                       smbiosDir.dir[smbiosDirIndex].dataStorage,
                                       smbiosFilePath);
+#endif // PUBLISH_INVENTORY
 }
 
 std::optional<size_t> MDRV2::getTotalSmbiosEntries(uint8_t smbiosType)

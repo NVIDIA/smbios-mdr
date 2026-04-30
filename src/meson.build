@@ -1,5 +1,9 @@
 # cpp_args_smbios is defined in root meson.build (shared with test/)
 
+if get_option('publish-inventory').allowed()
+    cpp_args_smbios += ['-DPUBLISH_INVENTORY']
+endif
+
 executable(
     'smbiosmdrv2app',
     'mdrv2.cpp',
