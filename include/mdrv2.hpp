@@ -127,6 +127,7 @@ class MDRV2 :
         lg2::info("SMBIOS control object: {O}", "O", smbiosObjectPath);
         lg2::info("SMBIOS inventory path: {I}", "I", smbiosInventoryPath);
 
+#ifdef PUBLISH_INVENTORY
         interfaceAddedMatch = std::make_unique<sdbusplus::bus::match_t>(
             *bus,
             sdbusplus::bus::match::rules::interfacesAdded() +
@@ -157,6 +158,7 @@ class MDRV2 :
                     }
                 }
             });
+#endif // PUBLISH_INVENTORY
 
         smbiosDir.agentVersion = smbiosAgentVersion;
         smbiosDir.dirVersion = smbiosDirVersion;

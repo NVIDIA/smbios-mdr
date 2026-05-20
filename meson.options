@@ -167,3 +167,16 @@ option(
     value: 'enabled',
     description: 'Expose Processor Module D-Bus Interface',
 )
+
+option(
+    'publish-inventory',
+    type: 'feature',
+    value: 'enabled',
+    description: '''Publish parsed SMBIOS records as inventory items on D-Bus.
+When disabled, smbiosmdrv2app still receives, persists, and serves raw
+SMBIOS records via xyz.openbmc_project.Smbios.MDR_V2 (so smbios-ipmi-blob
+and other producers keep working), but creates no inventory objects under
+/xyz/openbmc_project/inventory and does not register an ObjectManager
+there. Use this on systems where another service (e.g. NvidiaInfo) is the
+canonical inventory publisher for that subtree.''',
+)

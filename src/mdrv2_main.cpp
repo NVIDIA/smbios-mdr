@@ -29,8 +29,10 @@ int main()
     auto objServer =
         std::make_shared<sdbusplus::asio::object_server>(connection);
 
+#ifdef PUBLISH_INVENTORY
     sdbusplus::server::manager_t objManager(*connection,
                                             "/xyz/openbmc_project/inventory");
+#endif
 
     connection->request_name("xyz.openbmc_project.Smbios.MDR_V2");
 
