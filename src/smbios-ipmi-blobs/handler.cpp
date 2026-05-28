@@ -17,6 +17,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -192,7 +193,17 @@ bool SmbiosBlobHandler::commit(uint16_t session,
     MDRSMBIOSHeader mdrHdr;
     mdrHdr.dirVer = mdrDirVersion;
     mdrHdr.mdrType = mdrTypeII;
-    mdrHdr.timestamp = std::time(nullptr);
+    const std::time_t now = std::time(nullptr);
+    if (now < 0 || now > static_cast<std::time_t>(
+                             std::numeric_limits<std::uint32_t>::max()))
+    {
+        lg2::error("SMBIOS commit: system time invalid or out of "
+                   "32-bit range: {NOW}",
+                   "NOW", static_cast<long long>(now));
+        blobPtr->state |= blobs::StateFlags::commit_error;
+        return false;
+    }
+    mdrHdr.timestamp = static_cast<std::uint32_t>(now);
     mdrHdr.dataSize = blobPtr->buffer.size();
     if (access(defaultDir.c_str(), F_OK) == -1)
     {

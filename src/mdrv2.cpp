@@ -310,23 +310,29 @@ bool MDRV2::sendDataInformation(uint8_t idIndex, uint8_t /* flag */,
         throw sdbusplus::xyz::openbmc_project::Smbios::MDR_V2::Error::
             InvalidParameter();
     }
+    static_assert((maxDirEntries & (maxDirEntries - 1)) == 0,
+                  "maxDirEntries must be a power of two for the index mask");
+    idIndex &= static_cast<uint8_t>(maxDirEntries - 1);
+
+    auto& entry = smbiosDir.dir[idIndex].common;
+
     int entryChanged = 0;
-    if (smbiosDir.dir[idIndex].common.dataSetSize != dataLen)
+    if (entry.dataSetSize != dataLen)
     {
         entryChanged++;
-        smbiosDir.dir[idIndex].common.dataSetSize = dataLen;
+        entry.dataSetSize = dataLen;
     }
 
-    if (smbiosDir.dir[idIndex].common.dataVersion != dataVer)
+    if (entry.dataVersion != dataVer)
     {
         entryChanged++;
-        smbiosDir.dir[idIndex].common.dataVersion = dataVer;
+        entry.dataVersion = dataVer;
     }
 
-    if (smbiosDir.dir[idIndex].common.timestamp != timeStamp)
+    if (entry.timestamp != timeStamp)
     {
         entryChanged++;
-        smbiosDir.dir[idIndex].common.timestamp = timeStamp;
+        entry.timestamp = timeStamp;
     }
     if (entryChanged == 0)
     {

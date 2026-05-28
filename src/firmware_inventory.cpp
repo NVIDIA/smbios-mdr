@@ -48,6 +48,11 @@ std::vector<std::string> getExistingVersionPaths(sdbusplus::bus_t& bus)
 bool FirmwareInventory::getFirmwareInventoryData(uint8_t*& dataIn,
                                                  int inventoryIndex)
 {
+    constexpr int maxFirmwareInventoryEntries = 255;
+    if (inventoryIndex < 0 || inventoryIndex > maxFirmwareInventoryEntries)
+    {
+        return false;
+    }
     dataIn = getSMBIOSTypePtr(dataIn, firmwareInventoryInformationType);
     if (dataIn == nullptr)
     {
