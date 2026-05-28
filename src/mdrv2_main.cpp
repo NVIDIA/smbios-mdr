@@ -19,10 +19,15 @@
 #include <boost/asio/io_context.hpp>
 #include <phosphor-logging/elog-errors.hpp>
 #include <phosphor-logging/elog.hpp>
+#include <phosphor-logging/lg2.hpp>
 #include <sdbusplus/asio/connection.hpp>
 #include <sdbusplus/asio/object_server.hpp>
 
+#include <cstdlib>
+#include <exception>
+
 int main()
+try
 {
     auto io = std::make_shared<boost::asio::io_context>();
     auto connection = std::make_shared<sdbusplus::asio::connection>(*io);
@@ -44,4 +49,15 @@ int main()
     io->run();
 
     return 0;
+}
+catch (const std::exception& e)
+{
+    lg2::error("smbios-mdr: unhandled exception in main: {ERR}", "ERR",
+               e.what());
+    return EXIT_FAILURE;
+}
+catch (...)
+{
+    lg2::error("smbios-mdr: unknown unhandled exception in main");
+    return EXIT_FAILURE;
 }

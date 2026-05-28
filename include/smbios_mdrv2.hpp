@@ -365,38 +365,42 @@ static inline uint8_t* smbiosHandlePtr(uint8_t* smbiosDataIn, uint16_t handle)
 static inline std::string positionToString(uint8_t positionNum,
                                            uint8_t structLen, uint8_t* dataIn)
 {
-    if (dataIn == nullptr || positionNum == 0)
+    constexpr uint8_t maxSmbiosStringIndex = 64;
+    if (dataIn == nullptr || positionNum == 0 ||
+        positionNum > maxSmbiosStringIndex)
     {
         return "";
     }
     uint16_t limit = mdrSMBIOSSize; // set a limit to avoid endless loop
 
     char* target = reinterpret_cast<char*>(dataIn + structLen);
-    if (target == nullptr)
-    {
-        return "";
-    }
     for (uint8_t index = 1; index < positionNum; index++)
     {
         for (; *target != '\0'; target++)
         {
             limit--;
-            // When target = dataIn + structLen + limit,
-            // following target++ will be nullptr
-            if (limit < 1 || target == nullptr)
+            if (limit < 1)
             {
                 return "";
             }
         }
         target++;
-        if (target == nullptr || *target == '\0')
+        if (*target == '\0')
         {
             return ""; // 0x00 0x00 means end of the entry.
         }
     }
 
-    std::string result = target;
-    return result;
+    size_t outLen = 0;
+    while (outLen < limit && target[outLen] != '\0')
+    {
+        ++outLen;
+    }
+    if (outLen == limit)
+    {
+        return "";
+    }
+    return std::string(target, outLen);
 }
 
 static inline std::string getObjectPath(
