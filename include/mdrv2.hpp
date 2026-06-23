@@ -142,7 +142,7 @@ class MDRV2 :
                                  std::string, std::vector<uint8_t>>;
                 using PropertyMap = std::map<Property, Value>;
                 using InterfaceMap = std::map<Interface, PropertyMap>;
-                sdbusplus::message::object_path objPath;
+                sdbusplus::object_path objPath;
                 InterfaceMap interfaces;
                 m.read(objPath, interfaces);
 
