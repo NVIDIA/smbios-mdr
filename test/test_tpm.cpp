@@ -19,6 +19,7 @@
 #include "tpm.hpp"
 
 #include <cstring>
+#include <vector>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -58,6 +59,18 @@ TEST_F(TpmTest, ConstructorNoThrow)
         Tpm tpm(*bus, "/xyz/openbmc_project/test/inventory/system/tpm0", 0,
                 storage, "/xyz/openbmc_project/test/inventory/system");
     });
+}
+
+TEST_F(TpmTest, DuplicateObjectPathRegistrationThrows)
+{
+    uint8_t storage[64] = {0};
+    storage[0] = tpmDeviceType;
+    storage[1] = 28;
+    std::string path = "/xyz/openbmc_project/test/inventory/system/tpm0";
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    Tpm tpm(*bus, path, 0, storage, motherboard);
+    EXPECT_ANY_THROW({ Tpm duplicate(*bus, path, 1, storage, motherboard); });
 }
 
 TEST_F(TpmTest, TpmInfoUpdateNullStorage)
@@ -701,5 +714,76 @@ TEST_F(TpmTest, TpmFirmwareVersionSpecUnknown)
     EXPECT_NO_THROW({
         Tpm tpm(*bus, "/xyz/openbmc_project/test/inventory/system/tpm0", tpmID,
                 storage, motherboard);
+    });
+}
+
+// tpmId index 1 with only one TPM record: the iteration loop's second
+// getSMBIOSTypePtr returns null on the trailing padding (tpm.cpp line 50).
+TEST_F(TpmTest, TpmInfoUpdateIndexBeyondAvailableRecords)
+{
+    uint8_t storage[512] = {0};
+    storage[0] = tpmDeviceType;
+    storage[1] = 28;
+    storage[28] = 0;
+    storage[29] = 0;
+    EXPECT_NO_THROW({
+        Tpm tpm(*bus, "/xyz/openbmc_project/test/inventory/system/tpm1", 1,
+                storage, "/xyz/openbmc_project/test/inventory/system");
+    });
+}
+
+// Two TPM records, index 1: the iteration loop finds the 2nd record, covering
+// the getSMBIOSTypePtr-non-null (continue) direction (tpm.cpp line 50 false).
+TEST_F(TpmTest, TpmInfoUpdateSecondRecordFound)
+{
+    uint8_t storage[512] = {0};
+    storage[0] = tpmDeviceType;
+    storage[1] = 28;
+    storage[28] = 0;
+    storage[29] = 0;
+    storage[30] = tpmDeviceType;
+    storage[31] = 28;
+    storage[58] = 0;
+    storage[59] = 0;
+    EXPECT_NO_THROW({
+        Tpm tpm(*bus, "/xyz/openbmc_project/test/inventory/system/tpm1", 1,
+                storage, "/xyz/openbmc_project/test/inventory/system");
+    });
+}
+
+TEST_F(TpmTest, TpmDescriptionWellFormedString)
+{
+    uint8_t storage[512] = {0};
+    storage[0] = tpmDeviceType;
+    storage[1] = 0x1C;
+    storage[4] = 'I';
+    storage[5] = 'N';
+    storage[6] = 'T';
+    storage[7] = 'C';
+    storage[8] = tpmMajorVersion2;
+    storage[10] = 0x02;
+    storage[12] = 0x01;
+    storage[18] = 1;
+
+    const char strings[] = "TPM Device\0\0";
+    std::memcpy(storage + 0x1C, strings, sizeof(strings));
+
+    EXPECT_NO_THROW({
+        Tpm tpm(*bus, "/xyz/openbmc_project/test/inventory/system/tpm0", 0,
+                storage, "/xyz/openbmc_project/test/inventory/system");
+    });
+}
+
+TEST_F(TpmTest, TpmId1NextPtrNullReturnsEarly)
+{
+    std::vector<uint8_t> buf(2 * static_cast<size_t>(mdrSMBIOSSize), 0x01);
+    buf[0] = tpmDeviceType;
+    buf[1] = 0x1C;
+    buf[2] = 0;
+    buf[3] = 0;
+
+    EXPECT_NO_THROW({
+        Tpm tpm(*bus, "/xyz/openbmc_project/test/inventory/system/tpm1", 1,
+                buf.data(), "/xyz/openbmc_project/test/inventory/system");
     });
 }

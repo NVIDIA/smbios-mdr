@@ -25,6 +25,7 @@
 #include <fstream>
 #include <iostream>
 #include <regex>
+#include <utility>
 
 namespace phosphor
 {
@@ -316,7 +317,7 @@ void Dimm::dimmDeviceLocator(const uint8_t bankLocatorPositionNum,
 std::string Dimm::memoryDeviceLocator(std::string value)
 {
     return sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::
-        memoryDeviceLocator(value);
+        memoryDeviceLocator(std::move(value));
 }
 
 void Dimm::dimmType(const uint8_t type)
@@ -369,13 +370,13 @@ void Dimm::dimmTypeDetail(uint16_t detail)
         }
         detail >>= 1;
     }
-    memoryTypeDetail(result);
+    memoryTypeDetail(std::move(result));
 }
 
 std::string Dimm::memoryTypeDetail(std::string value)
 {
     return sdbusplus::server::xyz::openbmc_project::inventory::item::Dimm::
-        memoryTypeDetail(value);
+        memoryTypeDetail(std::move(value));
 }
 
 uint16_t Dimm::maxMemorySpeedInMhz(uint16_t value)
@@ -396,13 +397,13 @@ void Dimm::dimmManufacturer(const uint8_t positionNum, const uint8_t structLen,
         // present).
         result = "";
     }
-    manufacturer(result);
+    manufacturer(std::move(result));
 }
 
 std::string Dimm::manufacturer(std::string value)
 {
     return sdbusplus::server::xyz::openbmc_project::inventory::decorator::
-        Asset::manufacturer(value);
+        Asset::manufacturer(std::move(value));
 }
 
 bool Dimm::present(bool value)
@@ -416,13 +417,13 @@ void Dimm::dimmSerialNum(const uint8_t positionNum, const uint8_t structLen,
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
-    serialNumber(result);
+    serialNumber(std::move(result));
 }
 
 std::string Dimm::serialNumber(std::string value)
 {
     return sdbusplus::server::xyz::openbmc_project::inventory::decorator::
-        Asset::serialNumber(value);
+        Asset::serialNumber(std::move(value));
 }
 
 void Dimm::dimmPartNum(const uint8_t positionNum, const uint8_t structLen,
@@ -433,20 +434,20 @@ void Dimm::dimmPartNum(const uint8_t positionNum, const uint8_t structLen,
     // Part number could contain spaces at the end. Eg: "abcd123  ". Since its
     // unnecessary, we should remove them.
     boost::algorithm::trim_right(result);
-    partNumber(result);
+    partNumber(std::move(result));
 }
 
 std::string Dimm::partNumber(std::string value)
 {
     return sdbusplus::server::xyz::openbmc_project::inventory::decorator::
-        Asset::partNumber(value);
+        Asset::partNumber(std::move(value));
 }
 
 #ifdef DIMM_LOCATION_CODE
 std::string Dimm::locationCode(std::string value)
 {
     return sdbusplus::server::xyz::openbmc_project::inventory::decorator::
-        LocationCode::locationCode(value);
+        LocationCode::locationCode(std::move(value));
 }
 #endif
 

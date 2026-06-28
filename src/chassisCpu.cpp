@@ -21,6 +21,7 @@
 
 #include <bitset>
 #include <map>
+#include <utility>
 
 namespace phosphor
 {
@@ -32,7 +33,7 @@ void chassisCpu::locationString(const uint8_t positionNum,
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
-    location::locationCode(result);
+    location::locationCode(std::move(result));
 }
 
 void chassisCpu::manufacturer(const uint8_t positionNum,
@@ -40,7 +41,7 @@ void chassisCpu::manufacturer(const uint8_t positionNum,
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
-    asset::manufacturer(result);
+    asset::manufacturer(std::move(result));
 }
 
 void chassisCpu::partNumber(const uint8_t positionNum, const uint8_t structLen,
@@ -48,7 +49,7 @@ void chassisCpu::partNumber(const uint8_t positionNum, const uint8_t structLen,
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
-    asset::partNumber(result);
+    asset::partNumber(std::move(result));
 }
 
 void chassisCpu::serialNumber(const uint8_t positionNum,
@@ -56,7 +57,7 @@ void chassisCpu::serialNumber(const uint8_t positionNum,
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
-    asset::serialNumber(result);
+    asset::serialNumber(std::move(result));
 }
 
 void chassisCpu::assetTagString(const uint8_t positionNum,
@@ -64,7 +65,7 @@ void chassisCpu::assetTagString(const uint8_t positionNum,
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
-    assetTagType::assetTag(result);
+    assetTagType::assetTag(std::move(result));
 }
 
 void chassisCpu::model(const uint8_t positionNum, const uint8_t structLen,

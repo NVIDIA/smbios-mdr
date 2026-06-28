@@ -16,11 +16,21 @@
  */
 #include "cpuinfo_utils.hpp"
 
+#include <boost/asio/post.hpp>
+#include <boost/asio/steady_timer.hpp>
+#include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/exception.hpp>
+#include <xyz/openbmc_project/State/Host/server.hpp>
 
+#include <algorithm>
+#include <chrono>
 #include <cstdint>
+#include <future>
+#include <memory>
 #include <string>
+#include <thread>
 #include <type_traits>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -33,6 +43,210 @@ extern void updateOsState(const std::string& newState);
 
 namespace cpu_info
 {
+
+namespace
+{
+
+constexpr const char* hostService = "xyz.openbmc_project.State.Host";
+constexpr const char* hostObject = "/xyz/openbmc_project/state/host0";
+constexpr const char* hostStateRunning =
+    "xyz.openbmc_project.State.Host.HostState.Running";
+constexpr const char* miscService = "xyz.openbmc_project.Host.Misc.Manager";
+constexpr const char* miscObject = "/xyz/openbmc_project/misc/platform_state";
+constexpr const char* miscInterface = "xyz.openbmc_project.State.Host.Misc";
+constexpr const char* osService = "xyz.openbmc_project.State.Host0";
+constexpr const char* osInterface =
+    "xyz.openbmc_project.State.OperatingSystem.Status";
+
+void pumpCpuInfoIo(std::chrono::milliseconds timeout)
+{
+    auto& ioc = dbus::getIOContext();
+    boost::asio::steady_timer stopTimer(ioc, timeout);
+    stopTimer.async_wait([&ioc](const boost::system::error_code&) {
+        ioc.stop();
+    });
+    ioc.restart();
+    ioc.run();
+}
+
+class FakeHostStateServices
+{
+  public:
+    FakeHostStateServices()
+    {
+        std::promise<bool> ready;
+        auto future = ready.get_future();
+        worker = std::thread([this, &ready]() { run(&ready); });
+        started = future.get();
+    }
+
+    ~FakeHostStateServices()
+    {
+        if (io)
+        {
+            io->stop();
+        }
+        if (worker.joinable())
+        {
+            worker.join();
+        }
+    }
+
+    bool ok() const
+    {
+        return started;
+    }
+
+    void setHostState(const std::string& value)
+    {
+        setProperty(hostIface, "CurrentHostState", value);
+    }
+
+    void setBiosDone(bool value)
+    {
+        setProperty(miscIface, "CoreBiosDone", value);
+    }
+
+    void setOsState(const std::string& value)
+    {
+        setProperty(osIface, "OperatingSystemState", value);
+    }
+
+    void addWrongObjectOsInterface()
+    {
+        addInterface("/xyz/openbmc_project/state/host1", osInterface,
+                     "OperatingSystemState", std::string{"Standby"});
+    }
+
+    void addWrongNamedInterface()
+    {
+        addInterface(hostObject,
+                     "xyz.openbmc_project.State.OperatingSystem.Other",
+                     "OperatingSystemState", std::string{"Standby"});
+    }
+
+    void addWrongTypeOsInterface()
+    {
+        addInterface(hostObject, osInterface, "OperatingSystemState",
+                     uint32_t{7}, &osIface);
+    }
+
+    void replaceOsInterface(const std::string& value)
+    {
+        auto done = std::make_shared<std::promise<void>>();
+        auto future = done->get_future();
+        boost::asio::post(*io, [this, value, done]() {
+            if (osIface)
+            {
+                server->remove_interface(osIface);
+                dynamicIfaces.erase(std::remove(dynamicIfaces.begin(),
+                                                dynamicIfaces.end(), osIface),
+                                    dynamicIfaces.end());
+                osIface.reset();
+            }
+
+            auto iface = server->add_interface(hostObject, osInterface);
+            iface->register_property(
+                "UnrelatedProperty", uint32_t{1},
+                sdbusplus::asio::PropertyPermission::readWrite);
+            iface->register_property(
+                "OperatingSystemState", value,
+                sdbusplus::asio::PropertyPermission::readWrite);
+            iface->initialize();
+            osIface = iface;
+            dynamicIfaces.push_back(iface);
+            done->set_value();
+        });
+        future.wait();
+    }
+
+  private:
+    template <typename PropertyType>
+    void setProperty(
+        const std::shared_ptr<sdbusplus::asio::dbus_interface>& iface,
+        const std::string& property, const PropertyType& value)
+    {
+        auto done = std::make_shared<std::promise<void>>();
+        auto future = done->get_future();
+        boost::asio::post(*io, [iface, property, value, done]() {
+            iface->set_property(property, value);
+            done->set_value();
+        });
+        future.wait();
+    }
+
+    template <typename PropertyType>
+    void addInterface(
+        const std::string& object, const std::string& interface,
+        const std::string& property, const PropertyType& value,
+        std::shared_ptr<sdbusplus::asio::dbus_interface>* out = nullptr)
+    {
+        auto done = std::make_shared<std::promise<void>>();
+        auto future = done->get_future();
+        boost::asio::post(*io, [this, object, interface, property, value, out,
+                                done]() {
+            auto iface = server->add_interface(object, interface);
+            iface->register_property(
+                property, value,
+                sdbusplus::asio::PropertyPermission::readWrite);
+            iface->initialize();
+            if (out != nullptr)
+            {
+                *out = iface;
+            }
+            dynamicIfaces.push_back(iface);
+            done->set_value();
+        });
+        future.wait();
+    }
+
+    void run(std::promise<bool>* ready)
+    {
+        try
+        {
+            io = std::make_shared<boost::asio::io_context>();
+            conn = std::make_shared<sdbusplus::asio::connection>(*io);
+            conn->request_name(hostService);
+            conn->request_name(miscService);
+            conn->request_name(osService);
+            server = std::make_shared<sdbusplus::asio::object_server>(conn);
+
+            hostIface = server->add_interface(
+                hostObject, sdbusplus::server::xyz::openbmc_project::state::
+                                Host::interface);
+            hostIface->register_property(
+                "CurrentHostState", std::string{hostStateRunning},
+                sdbusplus::asio::PropertyPermission::readWrite);
+            hostIface->initialize();
+
+            miscIface = server->add_interface(miscObject, miscInterface);
+            miscIface->register_property(
+                "CoreBiosDone", false,
+                sdbusplus::asio::PropertyPermission::readWrite);
+            miscIface->initialize();
+
+            ready->set_value(true);
+        }
+        catch (const std::exception&)
+        {
+            ready->set_value(false);
+            return;
+        }
+        io->run();
+    }
+
+    std::shared_ptr<boost::asio::io_context> io;
+    std::shared_ptr<sdbusplus::asio::connection> conn;
+    std::shared_ptr<sdbusplus::asio::object_server> server;
+    std::shared_ptr<sdbusplus::asio::dbus_interface> hostIface;
+    std::shared_ptr<sdbusplus::asio::dbus_interface> miscIface;
+    std::shared_ptr<sdbusplus::asio::dbus_interface> osIface;
+    std::vector<std::shared_ptr<sdbusplus::asio::dbus_interface>> dynamicIfaces;
+    std::thread worker;
+    bool started{false};
+};
+
+} // namespace
 
 TEST(CpuinfoUtilsBit, ZeroReturnsOne)
 {
@@ -124,6 +338,40 @@ TEST(CpuinfoUtilsCpp, MultipleCallbacksCanBeRegistered)
     second = 0;
     addHostStateCallback([&](HostState, HostState) { ++first; });
     addHostStateCallback([&](HostState, HostState) { ++second; });
+    EXPECT_EQ(hostState, HostState::off);
+}
+
+TEST(CpuinfoUtilsCpp, HostStateSetupConsumesInitialPropertiesAndSignals)
+{
+    FakeHostStateServices services;
+    ASSERT_TRUE(services.ok()) << "fake host state services failed to start";
+
+    updatePowerState("xyz.openbmc_project.State.Host.HostState.Off");
+    updateBiosDone(false);
+    hostStateSetup(dbus::getConnection());
+    pumpCpuInfoIo(std::chrono::milliseconds(250));
+    EXPECT_EQ(hostState, HostState::postInProgress);
+
+    services.addWrongObjectOsInterface();
+    services.addWrongNamedInterface();
+    services.addWrongTypeOsInterface();
+    pumpCpuInfoIo(std::chrono::milliseconds(250));
+    EXPECT_EQ(hostState, HostState::postInProgress);
+
+    services.replaceOsInterface("Standby");
+    pumpCpuInfoIo(std::chrono::milliseconds(250));
+    EXPECT_EQ(hostState, HostState::postComplete);
+
+    services.setOsState("Inactive");
+    pumpCpuInfoIo(std::chrono::milliseconds(250));
+    EXPECT_EQ(hostState, HostState::postInProgress);
+
+    services.setBiosDone(true);
+    pumpCpuInfoIo(std::chrono::milliseconds(250));
+    EXPECT_EQ(hostState, HostState::postComplete);
+
+    services.setHostState("xyz.openbmc_project.State.Host.HostState.Off");
+    pumpCpuInfoIo(std::chrono::milliseconds(250));
     EXPECT_EQ(hostState, HostState::off);
 }
 

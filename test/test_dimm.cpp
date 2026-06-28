@@ -20,6 +20,9 @@
 
 #include <unistd.h>
 
+#include <sdbusplus/exception.hpp>
+
+#include <cerrno>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -165,6 +168,18 @@ TEST_F(DimmTest, MemoryInfoUpdateWithValidData)
     EXPECT_NO_THROW({
         Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0",
                   dimmId, storage, motherboard);
+    });
+}
+
+TEST_F(DimmTest, DuplicateObjectPathRegistrationThrows)
+{
+    auto smbiosData = createSMBIOSMemoryDevice(0);
+    std::string path = "/xyz/openbmc_project/test/inventory/system/dimm0";
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    Dimm dimm(*bus, path, 0, smbiosData.data(), motherboard);
+    EXPECT_ANY_THROW({
+        Dimm duplicate(*bus, path, 1, smbiosData.data(), motherboard);
     });
 }
 
@@ -410,6 +425,100 @@ TEST_F(DimmTest, MemoryInfoUpdateDeviceLocatorBankPlusDeviceSingleLetterSlot)
 
     std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
 
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0",
+                  dimmId, storage, motherboard);
+    });
+}
+
+// Config file present and the device locator matches an entry: drives the
+// non-empty parse path and the matching-entry branch (socket/controller/slot/
+// channel setters) in dimmDeviceLocator().
+TEST_F(DimmTest, MemoryInfoUpdateDeviceLocatorConfigFileMatch)
+{
+    uint8_t dimmId = 0;
+    auto smbiosData = createSMBIOSMemoryDevice(0);
+    uint8_t storage[2048] = {0};
+    std::memcpy(storage, smbiosData.data(),
+                std::min(smbiosData.size(), sizeof(storage)));
+    auto* memInfo = reinterpret_cast<MemoryInfo*>(storage);
+    memInfo->deviceLocator = 1; /* "DIMM_A" */
+    memInfo->bankLocator = 0;   /* empty -> result == deviceLocator */
+    uint8_t* strStart = storage + sizeof(MemoryInfo);
+    const char newStrings[] = "\0DIMM_A\0Manufacturer\0SN123\0TAG\0PN123\0\0";
+    std::memcpy(strStart, newStrings, sizeof(newStrings));
+
+    std::string cfg =
+        "/tmp/dimm_cfg_match_" + std::to_string(getpid()) + ".json";
+    {
+        std::ofstream f(cfg);
+        f << R"({"DIMM_A":{"MemoryController":1,"Socket":0,"Slot":2,)"
+          << R"("Channel":3}})";
+    }
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0",
+                  dimmId, storage, motherboard, cfg);
+    });
+    {
+        std::error_code removeEc;
+        std::filesystem::remove(cfg, removeEc);
+    }
+}
+
+// Config file present but the device locator is not in it: drives the
+// no-matching-entry (else) branch in dimmDeviceLocator().
+TEST_F(DimmTest, MemoryInfoUpdateDeviceLocatorConfigFileNoMatch)
+{
+    uint8_t dimmId = 0;
+    auto smbiosData = createSMBIOSMemoryDevice(0);
+    uint8_t storage[2048] = {0};
+    std::memcpy(storage, smbiosData.data(),
+                std::min(smbiosData.size(), sizeof(storage)));
+    auto* memInfo = reinterpret_cast<MemoryInfo*>(storage);
+    memInfo->deviceLocator = 1; /* "DIMM_Z" (absent from config) */
+    memInfo->bankLocator = 0;
+    uint8_t* strStart = storage + sizeof(MemoryInfo);
+    const char newStrings[] = "\0DIMM_Z\0Manufacturer\0SN123\0TAG\0PN123\0\0";
+    std::memcpy(strStart, newStrings, sizeof(newStrings));
+
+    std::string cfg =
+        "/tmp/dimm_cfg_nomatch_" + std::to_string(getpid()) + ".json";
+    {
+        std::ofstream f(cfg);
+        f << R"({"DIMM_A":{"MemoryController":1,"Socket":0,"Slot":2,)"
+          << R"("Channel":3}})";
+    }
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0",
+                  dimmId, storage, motherboard, cfg);
+    });
+    {
+        std::error_code removeEc;
+        std::filesystem::remove(cfg, removeEc);
+    }
+}
+
+// Device locator with a multi-letter slot suffix ("DIMM_AB"): the slot regex
+// matches alphabetic but length != 1, taking the false side of that check.
+TEST_F(DimmTest, MemoryInfoUpdateDeviceLocatorMultiLetterSlot)
+{
+    uint8_t dimmId = 0;
+    auto smbiosData = createSMBIOSMemoryDevice(0);
+    uint8_t storage[2048] = {0};
+    std::memcpy(storage, smbiosData.data(),
+                std::min(smbiosData.size(), sizeof(storage)));
+    auto* memInfo = reinterpret_cast<MemoryInfo*>(storage);
+    memInfo->deviceLocator = 1; /* "DIMM_AB" */
+    memInfo->bankLocator = 0;
+    uint8_t* strStart = storage + sizeof(MemoryInfo);
+    const char newStrings[] = "\0DIMM_AB\0Manufacturer\0SN123\0TAG\0PN123\0\0";
+    std::memcpy(strStart, newStrings, sizeof(newStrings));
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
     EXPECT_NO_THROW({
         Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0",
                   dimmId, storage, motherboard);
@@ -1213,3 +1322,409 @@ TEST(DimmHeader, DimmFormFactorMapLookup)
 {
     EXPECT_EQ(dimmFormFactorMap.at(0x10), FormFactor::Die);
 }
+
+// dimmId=1 with two MemoryInfo records exercises the for-loop body in
+// memoryInfoUpdate (lines 65-77 in dimm.cpp: smbiosNextPtr + getSMBIOSTypePtr
+// iteration).
+TEST_F(DimmTest, MemoryInfoUpdateDimmId1TwoDevicesProcessesSecond)
+{
+    auto dev0 = createSMBIOSMemoryDevice(0);
+    auto dev1 = createSMBIOSMemoryDevice(1);
+    uint8_t* dev0End = smbiosNextPtr(dev0.data());
+    ASSERT_NE(dev0End, nullptr);
+    dev0.resize(static_cast<size_t>(dev0End - dev0.data()));
+    std::vector<uint8_t> storage;
+    storage.insert(storage.end(), dev0.begin(), dev0.end());
+    storage.insert(storage.end(), dev1.begin(), dev1.end());
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm1",
+                  1, // dimmId=1 → loop runs once to reach second record
+                  storage.data(), motherboard);
+    });
+}
+
+// dimmId=1 with only ONE MemoryInfo record: smbiosNextPtr advances past it,
+// getSMBIOSTypePtr returns null → early return at line 73.
+TEST_F(DimmTest, MemoryInfoUpdateDimmId1SingleDeviceReturnsEarly)
+{
+    auto storage = createSMBIOSMemoryDevice(0);
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm1",
+                  1, // dimmId=1 → tries to advance past the only record
+                  storage.data(), motherboard);
+    });
+}
+
+// updateEccType with no type-16 in storage: getSMBIOSTypePtr returns null on
+// the first search, covering the early-return at line 153.
+TEST_F(DimmTest, UpdateEccTypeNoType16InStorageReturnsEarlyWithError)
+{
+    // Storage contains only a MemoryInfo (type 17), no PhysicalMemoryArray
+    // (type 16).  phyArrayHandle=0x1234 → no match possible.
+    auto storage = createSMBIOSMemoryDevice(0);
+    auto* memInfo = reinterpret_cast<MemoryInfo*>(storage.data());
+    memInfo->phyArrayHandle = 0x1234;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0", 0,
+                  storage.data(), motherboard);
+    });
+}
+
+// updateEccType with a type-16 whose handle does NOT match phyArrayHandle:
+// exercises the handle-mismatch branch (line 157 false) and smbiosNextPtr call
+// at line 172, then the while loop iterates and getSMBIOSTypePtr returns null.
+TEST_F(DimmTest, UpdateEccTypeType16HandleMismatchAdvancesLoop)
+{
+    auto data = createSMBIOSMemoryDevice(0);
+    auto* memInfo = reinterpret_cast<MemoryInfo*>(data.data());
+    memInfo->phyArrayHandle = 0x9999; // won't match the type-16 handle below
+
+    uint8_t type16Buf[32] = {0};
+    createType16PhysicalMemoryArray(type16Buf, 0x0001 /*handle*/, 0x05);
+    data.insert(data.end(), type16Buf, type16Buf + 25);
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0", 0,
+                  data.data(), motherboard);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Additional tests with carefully framed, contiguous SMBIOS records (no zero
+// padding between records, which would otherwise halt getSMBIOSTypePtr before
+// reaching a trailing type-16 record) targeting previously-uncovered branches
+// in dimm.cpp.
+// ---------------------------------------------------------------------------
+namespace
+{
+// Build a type-17 memory device followed (optionally) by a contiguous type-16
+// physical-memory-array record, with full control over the string set.
+std::vector<uint8_t> buildDimmBlob(
+    const std::vector<std::string>& strings, uint8_t bankLocatorIdx,
+    uint16_t phyHandle, bool withType16, uint16_t type16Handle, uint8_t eccType)
+{
+    std::vector<uint8_t> data;
+    struct MemoryInfo mem{};
+    mem.type = memoryDeviceType;
+    mem.length = sizeof(MemoryInfo);
+    mem.handle = 0x1000;
+    mem.phyArrayHandle = phyHandle;
+    mem.errInfoHandle = 0xFFFE;
+    mem.totalWidth = 72;
+    mem.dataWidth = 64;
+    mem.size = 8192;
+    mem.formFactor = 0x09;
+    mem.deviceLocator = 1;
+    mem.bankLocator = bankLocatorIdx;
+    mem.memoryType = 0x1A;
+    mem.manufacturer = 3;
+    mem.serialNum = 4;
+    mem.assetTag = 5;
+    mem.partNum = 6;
+    mem.memoryTechnology = 0x03;
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(&mem);
+    data.insert(data.end(), p, p + sizeof(MemoryInfo));
+    for (const auto& s : strings)
+    {
+        data.insert(data.end(), s.begin(), s.end());
+        data.push_back(0);
+    }
+    data.push_back(0); // end of string set
+
+    if (withType16)
+    {
+        PhysicalMemoryArrayInfo t16{};
+        t16.type = physicalMemoryArrayType;
+        t16.length = 23;
+        t16.handle = type16Handle;
+        t16.location = 0x01;
+        t16.use = 0x03;
+        t16.memoryErrorCorrection = eccType;
+        t16.numberOfMemoryDevices = 1;
+        const uint8_t* q = reinterpret_cast<const uint8_t*>(&t16);
+        data.insert(data.end(), q, q + sizeof(PhysicalMemoryArrayInfo));
+        data.push_back(0);
+        data.push_back(0);
+    }
+    // Trailing zero padding so SMBIOS table walks terminate cleanly instead of
+    // reading past the end of the buffer.
+    data.resize(data.size() + 512, 0);
+    return data;
+}
+
+class ThrowingSocketDimm : public Dimm
+{
+  public:
+    using Dimm::Dimm;
+
+    uint8_t socket(uint8_t) override
+    {
+        throw sdbusplus::exception::SdBusError(EIO, "forced dimm socket");
+    }
+};
+} // namespace
+
+// bankLocator empty -> result == deviceLocator (line 233); deviceLocator
+// "DIMM_A" -> single-letter slot parsing (line 308 true).
+TEST_F(DimmTest, DeviceLocatorBankEmptyAndSingleLetterSlot)
+{
+    auto data = buildDimmBlob({"DIMM_A", "BANK", "Mfr", "SN", "TAG", "PN"},
+                              /*bankLocatorIdx*/ 0, 0x0001, false, 0, 0);
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0", 0,
+                  data.data(), "/xyz/openbmc_project/test/inventory/system");
+    });
+}
+
+TEST_F(DimmTest, DeviceLocatorCpuSocketSdbusExceptionIsCaught)
+{
+    const std::string motherboard =
+        "/xyz/openbmc_project/test/inventory/system";
+    auto initial = buildDimmBlob({"DIMM0", "BANK0", "Mfr", "SN", "TAG", "PN"},
+                                 2, 0x0001, false, 0, 0);
+    ThrowingSocketDimm dimm(
+        *bus, "/xyz/openbmc_project/test/inventory/system/dimm_throw", 0,
+        initial.data(), motherboard);
+
+    auto update = buildDimmBlob({"CPU0", "BANK0", "Mfr", "SN", "TAG", "PN"}, 0,
+                                0x0001, false, 0, 0);
+    EXPECT_NO_THROW(dimm.memoryInfoUpdate(update.data(), motherboard));
+}
+
+// manufacturer string is exactly "NO DIMM" -> blanked (lines 392-397).
+TEST_F(DimmTest, ManufacturerExactlyNoDimmIsBlanked)
+{
+    auto data = buildDimmBlob({"DIMM0", "BANK0", "NO DIMM", "SN", "TAG", "PN"},
+                              2, 0x0001, false, 0, 0);
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0", 0,
+                  data.data(), "/xyz/openbmc_project/test/inventory/system");
+    });
+}
+
+// type-16 matching handle, ECC type present in map -> ecc(it->second) (167).
+TEST_F(DimmTest, EccContiguousMatchingHandleMappedType)
+{
+    auto data = buildDimmBlob({"DIMM0", "BANK0", "Mfr", "SN", "TAG", "PN"}, 2,
+                              0x0042, true, 0x0042, 0x05 /*SingleBitECC*/);
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0", 0,
+                  data.data(), "/xyz/openbmc_project/test/inventory/system");
+    });
+}
+
+// type-16 matching handle, ECC type NOT in map -> ecc(NoECC) (lines 161,163).
+TEST_F(DimmTest, EccContiguousMatchingHandleUnmappedType)
+{
+    auto data = buildDimmBlob({"DIMM0", "BANK0", "Mfr", "SN", "TAG", "PN"}, 2,
+                              0x0042, true, 0x0042, 0xFF /*not in map*/);
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0", 0,
+                  data.data(), "/xyz/openbmc_project/test/inventory/system");
+    });
+}
+
+// type-16 present but handle never matches -> loops, then "not found" (176).
+TEST_F(DimmTest, EccContiguousNoMatchingHandleLogsError)
+{
+    auto data = buildDimmBlob({"DIMM0", "BANK0", "Mfr", "SN", "TAG", "PN"}, 2,
+                              0x9999 /*phys handle*/, true,
+                              0x0001 /*type16 handle*/, 0x05);
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0", 0,
+                  data.data(), "/xyz/openbmc_project/test/inventory/system");
+    });
+}
+
+// configFilePath non-empty with a matching deviceLocator entry exercises the
+// ternary (line 249) and the JSON-found branch (253-266).
+TEST_F(DimmTest, DeviceLocatorWithConfigFileMatchedEntry)
+{
+    std::string cfg = "/tmp/dimm_cfg_" + std::to_string(getpid()) + ".json";
+    {
+        std::ofstream f(cfg);
+        f << R"({"DIMM0":{"MemoryController":1,"Socket":2,"Slot":3,"Channel":4}})";
+    }
+    auto data = buildDimmBlob({"DIMM0", "BANK0", "Mfr", "SN", "TAG", "PN"}, 2,
+                              0x0001, false, 0, 0);
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0", 0,
+                  data.data(), "/xyz/openbmc_project/test/inventory/system",
+                  cfg);
+    });
+    {
+        std::error_code removeEc;
+        std::filesystem::remove(cfg, removeEc);
+    }
+}
+
+// configFilePath non-empty but deviceLocator NOT in the JSON -> else branch
+// (lines 268-276) zeroes the location fields.
+TEST_F(DimmTest, DeviceLocatorWithConfigFileUnmatchedEntry)
+{
+    std::string cfg = "/tmp/dimm_cfg2_" + std::to_string(getpid()) + ".json";
+    {
+        std::ofstream f(cfg);
+        f << R"({"OTHER":{"MemoryController":1,"Socket":2,"Slot":3,"Channel":4}})";
+    }
+    auto data = buildDimmBlob({"DIMM0", "BANK0", "Mfr", "SN", "TAG", "PN"}, 2,
+                              0x0001, false, 0, 0);
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0", 0,
+                  data.data(), "/xyz/openbmc_project/test/inventory/system",
+                  cfg);
+    });
+    {
+        std::error_code removeEc;
+        std::filesystem::remove(cfg, removeEc);
+    }
+}
+
+// dimmId == 1 with a single memory record whose string area never terminates:
+// the per-index loop calls smbiosNextPtr, which hits the size limit and returns
+// nullptr, exercising the early-return branch inside the loop (dimm.cpp ~L68).
+TEST_F(DimmTest, DimmId1NextPtrNullReturnsEarly)
+{
+    // smbiosNextPtr scans up to mdrSMBIOSSize bytes starting past the record's
+    // formatted area before its endless-loop guard returns nullptr, so the
+    // buffer must be large enough to hold that whole scan (record offset +
+    // mdrSMBIOSSize + the two bytes read per iteration). Size generously to
+    // keep the scan in-bounds; otherwise it reads past the end (ASan abort).
+    std::vector<uint8_t> buf(2 * static_cast<size_t>(mdrSMBIOSSize), 0x01);
+    buf[0] = memoryDeviceType;
+    buf[1] = sizeof(MemoryInfo); // formatted length
+    buf[2] = 0;                  // handle lo
+    buf[3] = 0;                  // handle hi
+    // No double-null after the record -> smbiosNextPtr never terminates and
+    // returns nullptr at the limit.
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm1", 1,
+                  buf.data(), "/xyz/openbmc_project/test/inventory/system");
+    });
+}
+
+#ifdef DIMM_DBUS
+TEST_F(DimmTest, PublicSettersCoverChangedAndUnchangedValues)
+{
+    auto data = buildDimmBlob({"DIMM0", "BANK0", "Mfr", "SN", "TAG", "PN"}, 2,
+                              0x0042, true, 0x0042, 0x05);
+    Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm_setters",
+              0, data.data(), "/xyz/openbmc_project/test/inventory/system");
+
+    dimm.memoryDataWidth(64);
+    dimm.memoryDataWidth(64);
+    dimm.memoryTotalWidth(72);
+    dimm.memoryTotalWidth(72);
+    dimm.memorySizeInKB(8192);
+    dimm.memorySizeInKB(8192);
+    dimm.memoryDeviceLocator("BANK0 DIMM0");
+    dimm.memoryDeviceLocator("BANK0 DIMM0");
+    dimm.memoryType(DeviceType::DDR4);
+    dimm.memoryType(DeviceType::DDR4);
+    dimm.memoryTypeDetail("Synchronous");
+    dimm.memoryTypeDetail("Synchronous");
+    dimm.maxMemorySpeedInMhz(3200);
+    dimm.maxMemorySpeedInMhz(3200);
+    dimm.manufacturer("Mfr");
+    dimm.manufacturer("Mfr");
+    dimm.present(true);
+    dimm.present(true);
+    dimm.serialNumber("SN");
+    dimm.serialNumber("SN");
+    dimm.partNumber("PN");
+    dimm.partNumber("PN");
+#ifdef DIMM_LOCATION_CODE
+    dimm.locationCode("BANK0 DIMM0");
+    dimm.locationCode("BANK0 DIMM0");
+#endif
+    dimm.memoryAttributes(1);
+    dimm.memoryAttributes(1);
+    dimm.memoryMedia(MemoryTechType::DRAM);
+    dimm.memoryMedia(MemoryTechType::DRAM);
+    dimm.slot(1);
+    dimm.slot(1);
+    dimm.socket(1);
+    dimm.socket(1);
+    dimm.memoryController(1);
+    dimm.memoryController(1);
+    dimm.channel(1);
+    dimm.channel(1);
+    dimm.memoryConfiguredSpeedInMhz(3200);
+    dimm.memoryConfiguredSpeedInMhz(3200);
+    dimm.functional(true);
+    dimm.functional(true);
+    dimm.ecc(EccType::SingleBitECC);
+    dimm.ecc(EccType::SingleBitECC);
+    dimm.formFactor(FormFactor::RDIMM);
+    dimm.formFactor(FormFactor::RDIMM);
+}
+#endif
+
+#ifdef DIMM_DBUS
+TEST_F(DimmTest, UpdateEccTypeMismatchedType16WithUnterminatedTailFallsOut)
+{
+    auto data = buildDimmBlob({"DIMM0", "BANK0", "Mfr", "SN", "TAG", "PN"}, 2,
+                              0x9999, false, 0, 0);
+    data.resize(data.size() - 512);
+
+    PhysicalMemoryArrayInfo type16{};
+    type16.type = physicalMemoryArrayType;
+    type16.length = 23;
+    type16.handle = 0x0001;
+    type16.location = 0x01;
+    type16.use = 0x03;
+    type16.memoryErrorCorrection = 0x05;
+    type16.numberOfMemoryDevices = 1;
+    const auto* begin = reinterpret_cast<const uint8_t*>(&type16);
+    data.insert(data.end(), begin, begin + sizeof(type16));
+    data.insert(data.end(), static_cast<size_t>(mdrSMBIOSSize) + 32, 0x01);
+
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0", 0,
+                  data.data(), "/xyz/openbmc_project/test/inventory/system");
+    });
+}
+#endif
+
+#ifdef DIMM_DBUS
+namespace phosphor
+{
+namespace smbios
+{
+extern bool onlyDimmLocationCode;
+}
+} // namespace phosphor
+
+TEST_F(DimmTest, OnlyDimmLocationCodeUsesDeviceLocatorWithNonEmptyBank)
+{
+    auto data = buildDimmBlob({"DIMM_B", "BANK_B", "Mfr", "SN", "TAG", "PN"}, 2,
+                              0x0001, false, 0, 0);
+    const bool original = phosphor::smbios::onlyDimmLocationCode;
+    phosphor::smbios::onlyDimmLocationCode = true;
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0", 0,
+                  data.data(), "/xyz/openbmc_project/test/inventory/system");
+    });
+    phosphor::smbios::onlyDimmLocationCode = original;
+}
+
+TEST_F(DimmTest, DeviceLocatorMultiLetterDimmSuffixSkipsSlotSet)
+{
+    auto data = buildDimmBlob({"DIMM_AB", "BANK_AB", "Mfr", "SN", "TAG", "PN"},
+                              2, 0x0001, false, 0, 0);
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0", 0,
+                  data.data(), "/xyz/openbmc_project/test/inventory/system");
+    });
+}
+#endif

@@ -17,6 +17,8 @@
 #include "baseboard.hpp"
 #include "smbios_mdrv2.hpp"
 
+#include <phosphor-logging/lg2.hpp>
+
 #include <cstring>
 
 #include <gtest/gtest.h>
@@ -50,6 +52,23 @@ static void setStructureWithHandle(uint8_t* storage, size_t base,
     storage[base + 4] = 0;
     storage[base + 5] = 0;
     storage[base + 6] = 0;
+}
+
+static void setBaseboardTableWithTwoHandles(uint8_t* storage, uint16_t handle0,
+                                            uint16_t handle1)
+{
+    storage[0] = baseboardType;
+    storage[1] = 19;
+    storage[2] = 0x2B;
+    storage[3] = 0x00;
+    storage[13] = static_cast<uint8_t>(Baseboard::BoardType::ProcessorModule);
+    storage[14] = 2;
+    storage[15] = handle0 & 0xFF;
+    storage[16] = (handle0 >> 8) & 0xFF;
+    storage[17] = handle1 & 0xFF;
+    storage[18] = (handle1 >> 8) & 0xFF;
+    storage[19] = 0;
+    storage[20] = 0;
 }
 
 TEST(Baseboard, CompilesAndLinks)
@@ -144,4 +163,38 @@ TEST(Baseboard, BoardTypeEnumValues)
 {
     EXPECT_EQ(static_cast<uint8_t>(Baseboard::BoardType::Motherboard), 10);
     EXPECT_EQ(static_cast<uint8_t>(Baseboard::BoardType::ProcessorModule), 6);
+}
+
+// findIndexOfType: a matching handle returns {true,...} (line 122 true) and a
+// non-matching handle falls through to typeCount[...]++ (line 126).
+TEST(Baseboard, FindIndexOfTypeMatchAndNoMatch)
+{
+    uint8_t storage[256] = {0};
+    // Baseboard (type 2) containing one object with handle 0x1234.
+    setBaseboardTable(storage, 0, 6 /*ProcessorModule*/, 1, 0x1234);
+    // The contained structure itself, located at handle 0x1234.
+    setStructureWithHandle(storage, 19, 0x1234);
+
+    Baseboard bb(0, storage);
+
+    auto matched = bb.findIndexOfType(0x1234);
+    EXPECT_TRUE(matched.first);
+
+    auto missed = bb.findIndexOfType(0x9999);
+    EXPECT_FALSE(missed.first);
+}
+
+TEST(Baseboard, FindIndexOfTypeReturnsIndexWithinSameType)
+{
+    uint8_t storage[256] = {0};
+    const uint16_t firstHandle = 0x1234;
+    const uint16_t secondHandle = 0x1235;
+    setBaseboardTableWithTwoHandles(storage, firstHandle, secondHandle);
+    setStructureWithHandle(storage, 21, firstHandle);
+    setStructureWithHandle(storage, 28, secondHandle);
+
+    Baseboard bb(0, storage);
+    auto matched = bb.findIndexOfType(secondHandle);
+    EXPECT_TRUE(matched.first);
+    EXPECT_EQ(matched.second, 1);
 }

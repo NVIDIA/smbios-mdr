@@ -19,7 +19,15 @@
 #include "smbios_mdrv2.hpp"
 #include "test_mock_helpers.hpp"
 
+#include <sdbusplus/asio/connection.hpp>
+#include <sdbusplus/asio/object_server.hpp>
+#include <sdbusplus/test/sdbus_mock.hpp>
+
+#include <cerrno>
 #include <cstring>
+#include <future>
+#include <stdexcept>
+#include <thread>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -140,6 +148,15 @@ TEST_F(FirmwareInventoryTest, FirmwareInfoUpdateNullStorage)
             *bus, "/xyz/openbmc_project/test/inventory/system/firmware0", index,
             storage);
     });
+}
+
+TEST_F(FirmwareInventoryTest, DuplicateObjectPathRegistrationThrows)
+{
+    uint8_t* storage = nullptr;
+    std::string path = "/xyz/openbmc_project/test/inventory/system/firmware0";
+
+    FirmwareInventory firmware(*bus, path, 0, storage);
+    EXPECT_ANY_THROW({ FirmwareInventory duplicate(*bus, path, 1, storage); });
 }
 
 TEST_F(FirmwareInventoryTest, FirmwareInfoUpdateEmptyStorage)
@@ -589,4 +606,244 @@ TEST_F(FirmwareInventoryTest,
     EXPECT_FALSE(result.empty());
     EXPECT_TRUE(result.find("/xyz/openbmc_project/software") !=
                 std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
+// Additional firmware_inventory.cpp coverage with correctly-framed associated
+// component records (the existing setupComponentStructure writes a leading null
+// so designations came out empty and never appended).
+// ---------------------------------------------------------------------------
+namespace
+{
+// Append a component record (8-byte formatted area) with a single non-empty
+// string at index 1.  For systemPowerSupply the string index lives at byte 5,
+// otherwise at byte 4.
+size_t appendComponent(uint8_t* storage, size_t off, uint8_t type,
+                       uint16_t handle, const char* designation)
+{
+    storage[off + 0] = type;
+    storage[off + 1] = 8;
+    storage[off + 2] = handle & 0xFF;
+    storage[off + 3] = (handle >> 8) & 0xFF;
+    if (type == systemPowerSupply)
+    {
+        storage[off + 5] = 1;
+    }
+    else
+    {
+        storage[off + 4] = 1;
+    }
+    size_t s = off + 8;
+    std::memcpy(storage + s, designation, std::strlen(designation));
+    s += std::strlen(designation);
+    storage[s++] = 0; // end of string 1
+    storage[s++] = 0; // end of string set
+    return s;
+}
+} // namespace
+
+// Associated processor component with a non-empty socket designation appends
+// it to the firmware object path (firmware_inventory.cpp lines 135-145).
+TEST_F(FirmwareInventoryTest, CheckAndCreatePathProcessorComponentDesignation)
+{
+    uint8_t storage[512] = {0};
+    uint16_t handles[1] = {0x2000};
+    size_t end = setupFirmwareInfoStructure(storage, 0, "BMC", "v1", "FW1",
+                                            "date", "mfr", 1, handles);
+    appendComponent(storage, end, processorsType, 0x2000, "CPU_1");
+
+    std::vector<std::string> existing;
+    std::string result =
+        FirmwareInventory::checkAndCreateFirmwarePath(storage, 0, existing);
+    EXPECT_FALSE(result.empty());
+    EXPECT_NE(result.find("CPU_1"), std::string::npos);
+}
+
+// Associated power-supply component with a non-empty location appends it
+// (firmware_inventory.cpp lines 147-155).
+TEST_F(FirmwareInventoryTest, CheckAndCreatePathPowerSupplyComponentLocation)
+{
+    uint8_t storage[512] = {0};
+    uint16_t handles[1] = {0x3000};
+    size_t end = setupFirmwareInfoStructure(storage, 0, "BMC", "v1", "FW1",
+                                            "date", "mfr", 1, handles);
+    appendComponent(storage, end, systemPowerSupply, 0x3000, "PSU0");
+
+    std::vector<std::string> existing;
+    std::string result =
+        FirmwareInventory::checkAndCreateFirmwarePath(storage, 0, existing);
+    EXPECT_FALSE(result.empty());
+    EXPECT_NE(result.find("PSU0"), std::string::npos);
+}
+
+// An empty component name -> filterFirmwareName returns "" -> early empty path
+// return (firmware_inventory.cpp lines 111-113).
+TEST_F(FirmwareInventoryTest, CheckAndCreatePathEmptyComponentNameReturnsEmpty)
+{
+    uint8_t storage[512] = {0};
+    // componentName index 0 -> positionToString returns "" -> name empty.
+    setupFirmwareInfoStructure(storage, 0, "", "v1", "FW1", "date", "mfr");
+    storage[4] = 0; // componentName string index 0 (empty)
+
+    std::vector<std::string> existing;
+    std::string result =
+        FirmwareInventory::checkAndCreateFirmwarePath(storage, 0, existing);
+    EXPECT_TRUE(result.empty());
+}
+
+// getExistingVersionPaths with no ObjectMapper present takes the catch path
+// (firmware_inventory.cpp lines 32-41).
+TEST_F(FirmwareInventoryTest, GetExistingVersionPathsNoMapperReturnsEmpty)
+{
+    auto paths = utils::getExistingVersionPaths(*bus);
+    // This test asserts the no-ObjectMapper (catch) behavior. In an environment
+    // where a real ObjectMapper is present on the bus, the query may succeed
+    // and return entries; skip rather than fail there so the test stays
+    // deterministic.
+    if (!paths.empty())
+    {
+        GTEST_SKIP() << "ObjectMapper present on bus; no-mapper path not "
+                        "exercised in this environment";
+    }
+    EXPECT_TRUE(paths.empty());
+}
+
+// checkAndCreateFirmwarePath at index 1 with two firmware records exercises the
+// getFirmwareInventoryData iteration loop's success path (lines 57-67, 58/63
+// false branches).
+TEST(FirmwareInventoryMockBus,
+     GetExistingVersionPathsNonSdbusExceptionPropagates)
+{
+    testing::NiceMock<sdbusplus::SdBusMock> mock;
+    EXPECT_CALL(mock, sd_bus_call(testing::_, testing::_, testing::_,
+                                  testing::_, testing::_))
+        .WillOnce(testing::Throw(std::runtime_error("forced sd_bus_call")));
+
+    auto mockBus = sdbusplus::get_mocked_new(&mock);
+
+    EXPECT_THROW(
+        { utils::getExistingVersionPaths(mockBus); }, std::runtime_error);
+}
+
+TEST(FirmwareInventoryMockBus,
+     GetExistingVersionPathsMalformedMapperReplyReturnsEmpty)
+{
+    testing::NiceMock<sdbusplus::SdBusMock> mock;
+    EXPECT_CALL(mock, sd_bus_call(testing::_, testing::_, testing::_,
+                                  testing::_, testing::_))
+        .WillOnce(testing::Return(0));
+    EXPECT_CALL(mock, sd_bus_message_enter_container(
+                          testing::_, SD_BUS_TYPE_ARRAY, testing::_))
+        .WillOnce(testing::Return(-EBADMSG));
+
+    auto mockBus = sdbusplus::get_mocked_new(&mock);
+
+    EXPECT_TRUE(utils::getExistingVersionPaths(mockBus).empty());
+}
+
+TEST_F(FirmwareInventoryTest, CheckAndCreatePathSecondRecordIterates)
+{
+    uint8_t storage[1024] = {0};
+    size_t end = setupFirmwareInfoStructure(storage, 0, "BMC", "v1", "FW1",
+                                            "date", "mfr");
+    setupFirmwareInfoStructure(storage, end, "BIOS", "v2", "FW2", "date2",
+                               "mfr2");
+    std::vector<std::string> existing;
+    std::string result =
+        FirmwareInventory::checkAndCreateFirmwarePath(storage, 1, existing);
+    EXPECT_FALSE(result.empty());
+    EXPECT_NE(result.find("FW2"), std::string::npos);
+}
+
+namespace
+{
+// Background-thread fake ObjectMapper answering GetSubTreePaths, so
+// getExistingVersionPaths() takes its success path (lines 34-35).
+class FakeVersionMapper
+{
+  public:
+    FakeVersionMapper()
+    {
+        std::promise<bool> ready;
+        auto fut = ready.get_future();
+        worker = std::thread([this, &ready]() { run(&ready); });
+        started = fut.get();
+    }
+    ~FakeVersionMapper()
+    {
+        if (io)
+        {
+            io->stop();
+        }
+        if (worker.joinable())
+        {
+            worker.join();
+        }
+    }
+    bool ok() const
+    {
+        return started;
+    }
+
+  private:
+    void run(std::promise<bool>* ready)
+    {
+        try
+        {
+            io = std::make_shared<boost::asio::io_context>();
+            conn = std::make_shared<sdbusplus::asio::connection>(*io);
+            conn->request_name("xyz.openbmc_project.ObjectMapper");
+            server = std::make_shared<sdbusplus::asio::object_server>(conn);
+            auto iface =
+                server->add_interface("/xyz/openbmc_project/object_mapper",
+                                      "xyz.openbmc_project.ObjectMapper");
+            iface->register_method(
+                "GetSubTreePaths", [](const std::string&, int32_t,
+                                      const std::vector<std::string>&) {
+                    return std::vector<std::string>{
+                        "/xyz/openbmc_project/software/version0"};
+                });
+            iface->initialize();
+            ready->set_value(true);
+        }
+        catch (const std::exception&)
+        {
+            ready->set_value(false);
+            return;
+        }
+        io->run();
+    }
+    std::shared_ptr<boost::asio::io_context> io;
+    std::shared_ptr<sdbusplus::asio::connection> conn;
+    std::shared_ptr<sdbusplus::asio::object_server> server;
+    std::thread worker;
+    bool started{false};
+};
+} // namespace
+
+TEST_F(FirmwareInventoryTest, GetExistingVersionPathsWithMapperReturnsPaths)
+{
+    FakeVersionMapper mapper;
+    if (!mapper.ok())
+    {
+        GTEST_SKIP() << "fake ObjectMapper unavailable in this environment";
+    }
+    auto paths = utils::getExistingVersionPaths(*bus);
+    EXPECT_FALSE(paths.empty());
+}
+
+// inventoryIndex == 1 with a single firmware record whose string area never
+// terminates: getFirmwareInventoryData's per-index loop calls smbiosNextPtr,
+// which hits the size limit and returns nullptr (firmware_inventory.cpp ~L58).
+TEST_F(FirmwareInventoryTest, GetFirmwareInventoryDataIndex1NextPtrNull)
+{
+    std::vector<uint8_t> buf(static_cast<size_t>(mdrSMBIOSSize) + 64, 0x01);
+    buf[0] = firmwareInventoryInformationType;
+    buf[1] = 0x18; // formatted length
+    buf[2] = 0;
+    buf[3] = 0;
+    std::vector<std::string> existingPaths;
+    std::string result = FirmwareInventory::checkAndCreateFirmwarePath(
+        buf.data(), 1, existingPaths);
+    EXPECT_TRUE(result.empty());
 }

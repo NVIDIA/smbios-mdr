@@ -355,5 +355,100 @@ TEST(PcieSlot, PCIeTypeByLengthLookup)
     EXPECT_EQ(PCIeTypeByLength.at(0x04), PCIeType::FullLength);
 }
 
+// pcieId index 1 with only one PCIe slot record: the iteration loop's second
+// getSMBIOSTypePtr returns null on the trailing padding (pcieslot.cpp 35).
+TEST_F(PcieSlotFixture, PcieInfoUpdateIndexBeyondAvailableRecords)
+{
+    uint8_t storage[512] = {0};
+    storage[0] = systemSlots;
+    storage[1] = 17;
+    storage[5] = 0x09; // PCIe slot type
+    storage[17] = 0;
+    storage[18] = 0;
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    EXPECT_NO_THROW({
+        phosphor::smbios::Pcie pcie(
+            *bus, "/xyz/openbmc_project/test/inventory/system/pcieslot1", 1,
+            storage, motherboard);
+    });
+}
+
+// Two PCIe slot records, index 1: the loop finds the 2nd slot, covering the
+// getSMBIOSTypePtr-non-null direction (pcieslot.cpp 35 false) and index++ (39).
+TEST_F(PcieSlotFixture, PcieInfoUpdateSecondRecordFound)
+{
+    uint8_t storage[512] = {0};
+    storage[0] = systemSlots;
+    storage[1] = 17;
+    storage[5] = 0x09;
+    storage[17] = 0;
+    storage[18] = 0;
+    storage[19] = systemSlots;
+    storage[20] = 17;
+    storage[24] = 0x09;
+    storage[36] = 0;
+    storage[37] = 0;
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    EXPECT_NO_THROW({
+        phosphor::smbios::Pcie pcie(
+            *bus, "/xyz/openbmc_project/test/inventory/system/pcieslot1", 1,
+            storage, motherboard);
+    });
+}
+
+// pcieId == 1 with a single slot record whose string area never terminates:
+// the loop's smbiosNextPtr hits the size limit and returns nullptr, exercising
+// the early-return branch inside the loop (pcieslot.cpp ~L30).
+TEST_F(PcieSlotFixture, PcieId1NextPtrNullReturnsEarly)
+{
+    std::vector<uint8_t> buf(static_cast<size_t>(mdrSMBIOSSize) + 64, 0x01);
+    buf[0] = systemSlots;
+    buf[1] = 17; // formatted length
+    buf[2] = 0;
+    buf[3] = 0;
+    EXPECT_NO_THROW({
+        phosphor::smbios::Pcie pcie(
+            *bus, "/xyz/openbmc_project/test/inventory/system/pcieslot1", 1,
+            buf.data(), "/xyz/openbmc_project/test/inventory/system");
+    });
+}
+
+} // namespace smbios
+} // namespace phosphor
+
+namespace phosphor
+{
+namespace smbios
+{
+
+TEST_F(PcieSlotFixture, PcieInfoUpdateLoopSeesNonPcieRecordBeforeTarget)
+{
+    uint8_t storage[512] = {0};
+
+    storage[0] = systemSlots;
+    storage[1] = 17;
+    storage[5] = 0x14;
+    storage[17] = 0;
+    storage[18] = 0;
+
+    storage[19] = systemSlots;
+    storage[20] = 17;
+    storage[24] = 0x01;
+    storage[36] = 0;
+    storage[37] = 0;
+
+    storage[38] = systemSlots;
+    storage[39] = 17;
+    storage[43] = 0x14;
+    storage[55] = 0;
+    storage[56] = 0;
+
+    EXPECT_NO_THROW({
+        phosphor::smbios::Pcie pcie(
+            *bus, "/xyz/openbmc_project/test/inventory/system/pcieslot1", 1,
+            storage, "/xyz/openbmc_project/test/inventory/system");
+    });
+}
+
 } // namespace smbios
 } // namespace phosphor

@@ -1,4 +1,4 @@
-gtest = dependency('gtest', main: true)
+gtest = dependency('gtest_main', required: true)
 gmock = dependency('gmock')
 
 tests = [
@@ -6,6 +6,7 @@ tests = [
     'handler_open_unittest',
     'handler_readwrite_unittest',
     'handler_statclose_unittest',
+    'handler_commit_unittest',
 ]
 
 foreach t : tests

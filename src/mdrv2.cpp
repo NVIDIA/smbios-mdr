@@ -24,12 +24,144 @@
 #include <sdbusplus/exception.hpp>
 #include <xyz/openbmc_project/Smbios/MDR_V2/error.hpp>
 
+#include <algorithm>
+#include <array>
+#include <charconv>
 #include <fstream>
+#include <limits>
+#include <string_view>
 
 namespace phosphor
 {
 namespace smbios
 {
+
+namespace
+{
+
+void appendDecimal(std::string& value, size_t index)
+{
+    std::array<char, std::numeric_limits<size_t>::digits10 + 1> digits{};
+    const auto [ptr, ec] =
+        std::to_chars(digits.data(), digits.data() + digits.size(), index);
+    (void)ec;
+    value.append(digits.data(), static_cast<size_t>(ptr - digits.data()));
+}
+
+} // namespace
+
+const MDRV2::ProcessorModule* MDRV2::findProcessorModuleForCpu(
+    const std::vector<ProcessorModule>& modules, size_t socket)
+{
+    if (modules.empty())
+    {
+        return nullptr;
+    }
+
+    const bool singleModule = modules.size() == 1;
+    for (const auto& module : modules)
+    {
+        if (singleModule || (module.hasInstance && module.instance == socket))
+        {
+            return &module;
+        }
+    }
+
+    return nullptr;
+}
+
+std::string MDRV2::indexedName(std::string_view prefix, size_t index)
+{
+    std::string value;
+    value.reserve(prefix.size() + std::numeric_limits<size_t>::digits10 + 1);
+    value.append(prefix);
+    appendDecimal(value, index);
+    return value;
+}
+
+std::string MDRV2::indexedName(std::string_view prefix, std::string_view infix,
+                               size_t index)
+{
+    std::string value;
+    value.reserve(prefix.size() + infix.size() +
+                  std::numeric_limits<size_t>::digits10 + 1);
+    value.append(prefix);
+    value.append(infix);
+    appendDecimal(value, index);
+    return value;
+}
+
+std::string MDRV2::indexedChildPath(std::string_view parent,
+                                    std::string_view prefix, size_t index)
+{
+    std::string value;
+    value.reserve(parent.size() + 1 + prefix.size() +
+                  std::numeric_limits<size_t>::digits10 + 1);
+    value.append(parent);
+    value.push_back('/');
+    value.append(prefix);
+    appendDecimal(value, index);
+    return value;
+}
+
+std::string MDRV2::childPath(std::string_view parent, std::string_view child)
+{
+    std::string value;
+    value.reserve(parent.size() + 1 + child.size());
+    value.append(parent);
+    value.push_back('/');
+    value.append(child);
+    return value;
+}
+
+std::string MDRV2::pcieObjectPath(const std::string& inventoryPath,
+                                  const std::string& motherboardPath,
+                                  unsigned int index)
+{
+    return getObjectPath(inventoryPath, motherboardPath, pcieSuffix, index);
+}
+
+std::string MDRV2::systemObjectPath(const std::string& inventoryPath)
+{
+    std::string path = inventoryPath;
+    path += systemSuffix;
+    return path;
+}
+
+void MDRV2::applyProcessorModulePath(
+    const ProcessorModule& module, [[maybe_unused]] std::string& path,
+    std::string& cpuContainerPath, [[maybe_unused]] size_t index)
+{
+#ifndef PLATFORM_PREFIX
+#ifdef NVIDIA
+    constexpr const char* cpuObjectPrefix = "CPU_";
+#else
+    constexpr const char* cpuObjectPrefix = "cpu";
+#endif
+    path = indexedChildPath(module.path, cpuObjectPrefix, index);
+#endif
+    cpuContainerPath = module.path;
+}
+
+std::string MDRV2::memoryObjectName(
+    const std::vector<std::unique_ptr<Baseboard>>& baseboards,
+    uint16_t memoryHandle, size_t index)
+{
+    std::string objName = indexedName("Memory_", index);
+
+    for (const auto& baseboard : baseboards)
+    {
+        auto [found, indexOfType] = baseboard->findIndexOfType(memoryHandle);
+        if (found)
+        {
+            objName =
+                indexedName(baseboard->getName(), "_Memory_", indexOfType);
+            break;
+        }
+    }
+
+    return objName;
+}
 
 std::vector<uint8_t> MDRV2::getDirectoryInformation(uint8_t dirIndex)
 {
@@ -53,15 +185,10 @@ std::vector<uint8_t> MDRV2::getDirectoryInformation(uint8_t dirIndex)
     responseDir.push_back(smbiosDir.dirVersion);
     uint8_t returnedEntries = smbiosDir.dirEntries - dirIndex;
     responseDir.push_back(returnedEntries);
-    if ((dirIndex + returnedEntries) >= smbiosDir.dirEntries)
-    {
-        responseDir.push_back(0);
-    }
-    else
-    {
-        responseDir.push_back(
-            smbiosDir.dirEntries - dirIndex - returnedEntries);
-    }
+    // remainingEntries is always zero here: returnedEntries is computed as
+    // (dirEntries - dirIndex), so (dirIndex + returnedEntries) == dirEntries
+    // and no entries remain after this response.
+    responseDir.push_back(0);
     for (uint8_t index = dirIndex; index < smbiosDir.dirEntries; index++)
     {
         for (uint8_t indexId = 0; indexId < sizeof(DataIdStruct); indexId++)
@@ -133,7 +260,7 @@ std::vector<uint8_t> MDRV2::getDataOffer()
     return offer;
 }
 
-inline uint8_t MDRV2::smbiosValidFlag(uint8_t index)
+uint8_t MDRV2::smbiosValidFlag(uint8_t index)
 {
     FlagStatus ret = FlagStatus::flagIsInvalid;
     MDR2SMBIOSStatusEnum stage = smbiosDir.dir[index].stage;
@@ -286,10 +413,6 @@ bool MDRV2::sendDirectoryInformation(
         smbiosDir.dirEntries = returnedEntries;
 
         uint8_t* pData = dirEntry.data();
-        if (pData == nullptr)
-        {
-            return false;
-        }
         for (uint8_t index = 0; index < returnedEntries; index++)
         {
             auto data = reinterpret_cast<const DataIdStruct*>(pData);
@@ -420,13 +543,16 @@ void MDRV2::systemInfoUpdate()
     method.append(mapperAncestorPath);
     method.append(0);
 
-    // If customized, also accept Board as anchor, not just System
-    std::vector<std::string> desiredInterfaces{systemInterface};
     if (requireExactMatch)
     {
-        desiredInterfaces.emplace_back(boardInterface);
+        // If customized, also accept Board as anchor, not just System.
+        method.append(
+            std::vector<std::string>({systemInterface, boardInterface}));
     }
-    method.append(desiredInterfaces);
+    else
+    {
+        method.append(std::vector<std::string>({systemInterface}));
+    }
 
     try
     {
@@ -478,23 +604,7 @@ void MDRV2::systemInfoUpdate()
                             std::string, std::variant<std::string, uint64_t>>>
                         msgData;
                     msg.read(objectName, msgData);
-                    bool gotMatch = false;
-
-                    if (msgData.contains(systemInterface))
-                    {
-                        lg2::info("Successful match on system interface");
-                        gotMatch = true;
-                    }
-
-                    // If customized, also accept Board as anchor, not just
-                    // System
-                    if (requireExactMatch && msgData.contains(boardInterface))
-                    {
-                        lg2::info("Successful match on board interface");
-                        gotMatch = true;
-                    }
-
-                    if (gotMatch)
+                    if (motherboardConfigMatches(msgData, requireExactMatch))
                     {
                         // There is a race condition here: our desired interface
                         // has just been created, triggering the D-Bus callback,
@@ -526,7 +636,7 @@ void MDRV2::systemInfoUpdate()
               smbiosInventoryPath, "M", motherboardPath);
 
     // Get ProcessorModule inventories
-    std::vector<std::pair<std::string, std::optional<size_t>>> modules;
+    std::vector<ProcessorModule> modules;
     std::vector<std::pair<
         std::string,
         std::vector<std::pair<std::string, std::vector<std::string>>>>>
@@ -537,8 +647,8 @@ void MDRV2::systemInfoUpdate()
                              "xyz.openbmc_project.ObjectMapper", "GetSubTree");
     findProcModuleMethod.append(
         "/xyz/openbmc_project/inventory", 0,
-        std::array<const char*, 1>{
-            "xyz.openbmc_project.Inventory.Item.ProcessorModule"});
+        std::vector<std::string>(
+            {"xyz.openbmc_project.Inventory.Item.ProcessorModule"}));
     try
     {
         sdbusplus::message_t reply = bus->call(findProcModuleMethod);
@@ -552,8 +662,9 @@ void MDRV2::systemInfoUpdate()
     }
     for (auto& [path, services] : response)
     {
-        // instert the path with a empty instance number first
-        modules.push_back({path, {}});
+        // Insert the path with an empty instance number first.
+        modules.push_back({path, false, 0});
+        auto& module = modules.back();
         for (auto& [service, interfaces] : services)
         {
             for (auto& interface : interfaces)
@@ -572,9 +683,9 @@ void MDRV2::systemInfoUpdate()
                         sdbusplus::message_t reply =
                             bus->call(getInstanceMethod);
                         reply.read(instanceNumber);
-                        // Update the instance number
-                        modules.back().second =
-                            std::get<uint64_t>(instanceNumber);
+                        // Update the instance number.
+                        module.instance = std::get<uint64_t>(instanceNumber);
+                        module.hasInstance = true;
                     }
                     catch (const sdbusplus::exception_t& e)
                     {
@@ -629,38 +740,24 @@ void MDRV2::systemInfoUpdate()
         return;
     }
 
-    // In case the new size is smaller than old, trim the vector
-    if (*num < cpus.size())
-    {
-        cpus.resize(*num);
-    }
-
     for (unsigned int index = 0; index < *num; index++)
     {
-        std::string path = cpuPath + std::to_string(index);
+        std::string path = indexedName(cpuPath, index);
         std::string cpuContainerPath = motherboardPath;
 
         // customize path if we know the socket number
         auto dataPtr = getSMBIOSTypeIndexPtr(
             smbiosDir.dir[smbiosDirIndex].dataStorage, processorsType, index);
         auto [found, socket, chip] = Cpu::socketChipNumber(dataPtr);
-        if (found && modules.size())
+        if (found)
         {
-            for (auto& [modulePath, moduleIntanceOpt] : modules)
+            const ProcessorModule* module =
+                findProcessorModuleForCpu(modules, socket);
+            if (module != nullptr)
             {
-                if (modules.size() == 1 || (moduleIntanceOpt.has_value() &&
-                                            *moduleIntanceOpt == socket))
-                {
-                    // make the cpu under socket path
-#ifndef PLATFORM_PREFIX
-                    std::filesystem::path filePath(path);
-                    path.assign(modulePath)
-                        .append("/")
-                        .append(filePath.filename().string());
-#endif
-                    cpuContainerPath = modulePath;
-                    break;
-                }
+                // make the cpu under socket path
+                applyProcessorModulePath(*module, path, cpuContainerPath,
+                                         index);
             }
         }
 
@@ -680,34 +777,16 @@ void MDRV2::systemInfoUpdate()
         return;
     }
 
-    // In case the new size is smaller than old, trim the vector
-    if (*num < dimms.size())
-    {
-        dimms.resize(*num);
-    }
-
     for (unsigned int index = 0; index < *num; index++)
     {
-        std::string objName = "Memory_" + std::to_string(index);
-
         // Rename the object if it's contaned by a board
         uint8_t* dataIn = smbiosDir.dir[smbiosDirIndex].dataStorage;
         dataIn = getSMBIOSTypeIndexPtr(dataIn, memoryDeviceType, index);
         auto memoryHeader = reinterpret_cast<struct StructureHeader*>(dataIn);
-        for (const auto& baseboard : baseboards)
-        {
-            auto [found, indexOfType] =
-                baseboard->findIndexOfType(memoryHeader->handle);
-            if (found == true)
-            {
-                objName = baseboard->getName() + "_" + "Memory_" +
-                          std::to_string(indexOfType);
-                break;
-            }
-        }
+        std::string objName =
+            memoryObjectName(baseboards, memoryHeader->handle, index);
 
-        std::string path(dimmPath);
-        path += "/" + objName;
+        std::string path = childPath(dimmPath, objName);
         dimms.emplace_back(std::make_unique<phosphor::smbios::Dimm>(
             *bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
             motherboardPath));
@@ -722,27 +801,13 @@ void MDRV2::systemInfoUpdate()
         return;
     }
 
-    // In case the new size is smaller than old, trim the vector
-    if (*num < pcies.size())
-    {
-        pcies.resize(*num);
-    }
-
     for (unsigned int index = 0; index < *num; index++)
     {
-        std::string path = getObjectPath(smbiosInventoryPath, motherboardPath,
-                                         pcieSuffix, index);
-        if (index + 1 > pcies.size())
-        {
-            pcies.emplace_back(std::make_unique<phosphor::smbios::Pcie>(
-                *bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
-                motherboardPath));
-        }
-        else
-        {
-            pcies[index]->pcieInfoUpdate(
-                smbiosDir.dir[smbiosDirIndex].dataStorage, motherboardPath);
-        }
+        std::string path =
+            pcieObjectPath(smbiosInventoryPath, motherboardPath, index);
+        pcies.emplace_back(std::make_unique<phosphor::smbios::Pcie>(
+            *bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
+            motherboardPath));
     }
 
 #ifdef TPM_DBUS
@@ -810,9 +875,9 @@ void MDRV2::systemInfoUpdate()
 #endif
 
     system.reset();
-    system = std::make_unique<System>(bus, smbiosInventoryPath + systemSuffix,
-                                      smbiosDir.dir[smbiosDirIndex].dataStorage,
-                                      smbiosFilePath);
+    system = std::make_unique<System>(
+        bus, systemObjectPath(smbiosInventoryPath),
+        smbiosDir.dir[smbiosDirIndex].dataStorage, smbiosFilePath);
 #endif // PUBLISH_INVENTORY
 }
 
@@ -863,27 +928,25 @@ std::optional<size_t> MDRV2::getTotalSmbiosEntries(uint8_t smbiosType)
 
 bool MDRV2::checkSMBIOSVersion(uint8_t* dataIn)
 {
-    const std::string anchorString21 = "_SM_";
-    const std::string anchorString30 = "_SM3_";
-    std::string buffer(reinterpret_cast<const char*>(dataIn),
-                       smbiosTableStorageSize);
+    const auto* dataBegin = reinterpret_cast<const char*>(dataIn);
+    const auto* dataEnd = dataBegin + smbiosTableStorageSize;
 
-    auto it = std::search(std::begin(buffer), std::end(buffer),
-                          std::begin(anchorString21), std::end(anchorString21));
-    bool smbios21Found = it != std::end(buffer);
+    auto it = std::search(dataBegin, dataEnd, anchorString21.begin(),
+                          anchorString21.end());
+    bool smbios21Found = it != dataEnd;
     if (!smbios21Found)
     {
         lg2::info("SMBIOS 2.1 Anchor String not found. Looking for SMBIOS 3.0");
-        it = std::search(std::begin(buffer), std::end(buffer),
-                         std::begin(anchorString30), std::end(anchorString30));
-        if (it == std::end(buffer))
+        it = std::search(dataBegin, dataEnd, anchorString30.begin(),
+                         anchorString30.end());
+        if (it == dataEnd)
         {
             lg2::error("SMBIOS 2.1 and 3.0 Anchor Strings not found");
             return false;
         }
     }
 
-    auto pos = std::distance(std::begin(buffer), it);
+    size_t pos = static_cast<size_t>(std::distance(dataBegin, it));
     size_t length = smbiosTableStorageSize - pos;
     uint8_t foundMajorVersion;
     uint8_t foundMinorVersion;

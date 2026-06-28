@@ -56,6 +56,20 @@ TEST_F(ChassisCpuTest, ChassisCpuInfoUpdateNullStorage)
     });
 }
 
+TEST_F(ChassisCpuTest, DuplicateObjectPathRegistrationThrows)
+{
+    uint8_t* storage = nullptr;
+    std::string path =
+        "/xyz/openbmc_project/test/inventory/system/chassis_cpu0";
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath = path;
+
+    chassisCpu ccpu(*bus, path, 0, storage, motherboard, assocPath);
+    EXPECT_ANY_THROW({
+        chassisCpu duplicate(*bus, path, 1, storage, motherboard, assocPath);
+    });
+}
+
 TEST_F(ChassisCpuTest, ChassisCpuInfoUpdateEmptyStorage)
 {
     uint8_t cpuId = 0;
@@ -754,3 +768,112 @@ TEST_F(ChassisCpuTest, InfoUpdate_SocketNotPopulated_PresentAndFunctionalFalse)
             cpuId, storage, motherboard, assocPath);
     });
 }
+
+// cpuId index 1 with only one processor record: iteration loop's second
+// getSMBIOSTypePtr returns null on the trailing padding (chassisCpu.cpp 106).
+TEST_F(ChassisCpuTest, ChassisCpuInfoUpdateIndexBeyondAvailableRecords)
+{
+    uint8_t cpuId = 1;
+    uint8_t storage[512] = {0};
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[24] = 0x41;
+    storage[50] = 0;
+    storage[51] = 0;
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath =
+        "/xyz/openbmc_project/test/inventory/system/chassis_cpu1";
+    EXPECT_NO_THROW({
+        chassisCpu ccpu(
+            *bus, "/xyz/openbmc_project/test/inventory/system/chassis_cpu1",
+            cpuId, storage, motherboard, assocPath);
+    });
+}
+
+// Two processor records, index 1: the iteration loop finds the 2nd record,
+// covering the getSMBIOSTypePtr-non-null direction (chassisCpu.cpp 106 false).
+TEST_F(ChassisCpuTest, ChassisCpuInfoUpdateSecondRecordFound)
+{
+    uint8_t cpuId = 1;
+    uint8_t storage[512] = {0};
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[24] = 0x41;
+    storage[50] = 0;
+    storage[51] = 0;
+    storage[52] = processorsType;
+    storage[53] = 50;
+    storage[76] = 0x41;
+    storage[102] = 0;
+    storage[103] = 0;
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath =
+        "/xyz/openbmc_project/test/inventory/system/chassis_cpu1";
+    EXPECT_NO_THROW({
+        chassisCpu ccpu(
+            *bus, "/xyz/openbmc_project/test/inventory/system/chassis_cpu1",
+            cpuId, storage, motherboard, assocPath);
+    });
+}
+
+#ifdef CPU_DBUS_CHASSISIFACE
+namespace
+{
+void setWellFormedChassisProcessorRecord(uint8_t* storage)
+{
+    std::memset(storage, 0, 512);
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[4] = 1;
+    storage[7] = 2;
+    storage[16] = 3;
+    storage[24] = 0x41;
+    storage[32] = 4;
+    storage[33] = 5;
+    storage[34] = 6;
+
+    const char strings[] =
+        "CPU0\0ChassisVendor\0ChassisModel\0Serial123\0Asset123\0Part123\0\0";
+    std::memcpy(storage + 50, strings, sizeof(strings));
+}
+} // namespace
+
+TEST_F(ChassisCpuTest, WellFormedStringsDriveAllStringSetters)
+{
+    uint8_t storage[512] = {0};
+    setWellFormedChassisProcessorRecord(storage);
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath =
+        "/xyz/openbmc_project/test/inventory/system/chassis_cpu_well_formed";
+
+    EXPECT_NO_THROW({
+        chassisCpu ccpu(
+            *bus,
+            "/xyz/openbmc_project/test/inventory/system/chassis_cpu_well_formed",
+            0, storage, motherboard, assocPath);
+    });
+}
+#endif
+
+#ifdef CPU_DBUS_CHASSISIFACE
+TEST_F(ChassisCpuTest, ChassisCpuInfoUpdateNextPtrNullReturnsEarlyAbiGuarded)
+{
+    std::vector<uint8_t> storage(2 * static_cast<size_t>(mdrSMBIOSSize), 0x01);
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[2] = 0;
+    storage[3] = 0;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath =
+        "/xyz/openbmc_project/test/inventory/system/chassis_cpu_next_null";
+
+    EXPECT_NO_THROW({
+        chassisCpu ccpu(
+            *bus,
+            "/xyz/openbmc_project/test/inventory/system/chassis_cpu_next_null",
+            1, storage.data(), motherboard, assocPath);
+    });
+}
+#endif

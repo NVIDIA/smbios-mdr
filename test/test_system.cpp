@@ -21,10 +21,17 @@
 
 #include <unistd.h>
 
+#include <sdbusplus/asio/connection.hpp>
+#include <sdbusplus/asio/object_server.hpp>
+#include <sdbusplus/test/sdbus_mock.hpp>
+
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <future>
+#include <stdexcept>
+#include <thread>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -55,6 +62,15 @@ TEST_F(SystemTest, ConstructorNoThrow)
         System system(conn, "/xyz/openbmc_project/test/inventory/system",
                       storage, testFilePath);
     });
+}
+
+TEST_F(SystemTest, DuplicateObjectPathRegistrationThrows)
+{
+    uint8_t storage[64] = {0};
+    std::string path = "/xyz/openbmc_project/test/inventory/system";
+
+    System system(conn, path, storage, testFilePath);
+    EXPECT_ANY_THROW({ System duplicate(conn, path, storage, testFilePath); });
 }
 
 TEST_F(SystemTest, UuidNullStorage)
@@ -243,22 +259,50 @@ TEST_F(SystemTest, VersionWithNonPrintableChars)
 
     storage[0] = biosType;
     storage[1] = 24;
-    storage[2] = 0x00;
-    storage[3] = 0x00;
     storage[4] = 1;
     storage[5] = 2;
 
-    storage[24] = 0;
-    storage[25] = 0;
-
+    // structLen=24, so strings begin at offset 24 (not 26)
     const char strings[] = "Vendor\0v1.0\x01\0Date\0\0";
-    std::memcpy(storage + 26, strings, sizeof(strings));
+    std::memcpy(storage + 24, strings, sizeof(strings));
 
     System system(conn, "/xyz/openbmc_project/test/inventory/system", storage,
                   testFilePath);
 
     EXPECT_NO_THROW({ auto result = system.version(""); });
 }
+
+#ifdef PUBLISH_INVENTORY
+TEST_F(SystemTest, VersionNonPrintableAtFindIfUnrolledOffsets)
+{
+    for (size_t badOffset = 0; badOffset < 6; ++badOffset)
+    {
+        uint8_t storage[512] = {0};
+        storage[0] = biosType;
+        storage[1] = 24;
+        storage[4] = 1;
+        storage[5] = 2;
+
+        const size_t versionLength = badOffset >= 4 ? 7 : 8;
+        std::string version(versionLength, 'A');
+        version[badOffset] = '\x01';
+        std::string strings = "Vendor";
+        strings.push_back('\0');
+        strings += version;
+        strings.push_back('\0');
+        strings += "Date";
+        strings.push_back('\0');
+        strings.push_back('\0');
+        std::memcpy(storage + 24, strings.data(), strings.size());
+
+        System system(conn,
+                      "/xyz/openbmc_project/test/inventory/system_find_" +
+                          std::to_string(badOffset),
+                      storage, testFilePath);
+        EXPECT_NO_THROW(system.version(""));
+    }
+}
+#endif
 
 TEST_F(SystemTest, VersionWithFileOperationFailure)
 {
@@ -269,12 +313,10 @@ TEST_F(SystemTest, VersionWithFileOperationFailure)
     storage[4] = 1;
     storage[5] = 2;
 
-    storage[24] = 0;
-    storage[25] = 0;
-
+    // structLen=24, strings at offset 24; non-printable char triggers file open
     std::string invalidPath = "/invalid/path/that/does/not/exist/smbios2";
     const char strings[] = "Vendor\0v1.0\x01\0Date\0\0";
-    std::memcpy(storage + 26, strings, sizeof(strings));
+    std::memcpy(storage + 24, strings, sizeof(strings));
 
     System system(conn, "/xyz/openbmc_project/test/inventory/system", storage,
                   invalidPath);
@@ -291,11 +333,11 @@ TEST_F(SystemTest, VersionNonPrintableWithWritableDirTruncatesFile)
     storage[1] = 24;
     storage[4] = 1;
     storage[5] = 2;
-    storage[24] = 0;
-    storage[25] = 0;
 
+    // structLen=24, strings at offset 24 so non-printable char branch is
+    // entered
     const char strings[] = "Vendor\0v1.0\x01\0Date\0\0";
-    std::memcpy(storage + 26, strings, sizeof(strings));
+    std::memcpy(storage + 24, strings, sizeof(strings));
 
     std::string tmpDir = std::filesystem::temp_directory_path().string() +
                          "/smbios_mdr_test_" + std::to_string(getpid());
@@ -526,6 +568,35 @@ TEST_F(SystemTest, GetServiceException)
     EXPECT_NO_THROW({ auto result = system.version(""); });
 }
 
+TEST(SystemMockBus, GetServiceNonSdbusExceptionPropagates)
+{
+    testing::NiceMock<sdbusplus::SdBusMock> mock;
+    EXPECT_CALL(mock, sd_bus_call(testing::_, testing::_, testing::_,
+                                  testing::_, testing::_))
+        .WillOnce(testing::Throw(std::runtime_error("forced sd_bus_call")));
+
+    boost::asio::io_context io;
+    auto mockBus = sdbusplus::get_mocked_new(&mock);
+    auto mockConn =
+        std::make_shared<sdbusplus::asio::connection>(io, std::move(mockBus));
+
+    uint8_t storage[512] = {0};
+    storage[0] = biosType;
+    storage[1] = 24;
+    storage[4] = 1;
+    storage[5] = 2;
+    const char strings[] = "Vendor\0v1.2.3\0Date\0\0";
+    std::memcpy(storage + 24, strings, sizeof(strings));
+
+    EXPECT_THROW(
+        {
+            System system(mockConn,
+                          "/xyz/openbmc_project/test/inventory/system", storage,
+                          "");
+        },
+        std::runtime_error);
+}
+
 TEST_F(SystemTest, SetPropertyEmptyService)
 {
     uint8_t storage[512] = {0};
@@ -586,3 +657,145 @@ TEST_F(SystemTest, UuidWithMakeSystemTable)
     EXPECT_EQ(result.size(), 36u);
     EXPECT_NE(result, "00000000-0000-0000-0000-000000000000");
 }
+
+// ---------------------------------------------------------------------------
+// In-process fake ObjectMapper (background thread) so
+// getService()/setProperty() in system.cpp succeed instead of throwing,
+// covering the GetObject reply handling (lines 88,89,101), the non-empty
+// service branch (110), and the Properties.Set call (116-120).
+// ---------------------------------------------------------------------------
+namespace
+{
+class FakeMapperForSystem
+{
+  public:
+    explicit FakeMapperForSystem(bool hostBios_ = true) : hostBios(hostBios_)
+    {
+        std::promise<bool> ready;
+        auto fut = ready.get_future();
+        worker = std::thread([this, &ready]() { run(&ready); });
+        started = fut.get();
+    }
+    ~FakeMapperForSystem()
+    {
+        if (io)
+        {
+            io->stop();
+        }
+        if (worker.joinable())
+        {
+            worker.join();
+        }
+    }
+    bool ok() const
+    {
+        return started;
+    }
+
+  private:
+    void run(std::promise<bool>* ready)
+    {
+        try
+        {
+            io = std::make_shared<boost::asio::io_context>();
+            conn = std::make_shared<sdbusplus::asio::connection>(*io);
+            conn->request_name("xyz.openbmc_project.ObjectMapper");
+            if (hostBios)
+            {
+                conn->request_name("xyz.openbmc_project.BIOSConfigManager");
+            }
+            server = std::make_shared<sdbusplus::asio::object_server>(conn);
+            auto iface =
+                server->add_interface("/xyz/openbmc_project/object_mapper",
+                                      "xyz.openbmc_project.ObjectMapper");
+            const std::string biosService =
+                hostBios ? "xyz.openbmc_project.BIOSConfigManager"
+                         : "xyz.openbmc_project.MissingBIOSConfigManager";
+            iface->register_method(
+                "GetObject", [biosService](const std::string&,
+                                           const std::vector<std::string>&) {
+                    std::vector<
+                        std::pair<std::string, std::vector<std::string>>>
+                        ret{{biosService,
+                             {"xyz.openbmc_project.Software.Version"}}};
+                    return ret;
+                });
+            iface->initialize();
+
+            // Host the bios_active object with a writable Version property so
+            // setProperty()'s Properties.Set succeeds cleanly.
+            if (hostBios)
+            {
+                auto biosIface = server->add_interface(
+                    "/xyz/openbmc_project/software/bios_active",
+                    "xyz.openbmc_project.Software.Version");
+                biosIface->register_property(
+                    "Version", std::string{""},
+                    sdbusplus::asio::PropertyPermission::readWrite);
+                biosIface->initialize();
+            }
+
+            ready->set_value(true);
+        }
+        catch (const std::exception&)
+        {
+            ready->set_value(false);
+            return;
+        }
+        io->run();
+    }
+    bool hostBios;
+    std::shared_ptr<boost::asio::io_context> io;
+    std::shared_ptr<sdbusplus::asio::connection> conn;
+    std::shared_ptr<sdbusplus::asio::object_server> server;
+    std::thread worker;
+    bool started{false};
+};
+} // namespace
+
+TEST_F(SystemTest, VersionWithMapperSetPropertySucceeds)
+{
+    FakeMapperForSystem mapper;
+    if (!mapper.ok())
+    {
+        GTEST_SKIP() << "fake ObjectMapper unavailable in this environment";
+    }
+
+    uint8_t storage[512] = {0};
+    storage[0] = biosType;
+    storage[1] = 24;
+    storage[4] = 1;
+    storage[5] = 2;
+    const char strings[] = "Vendor\0v9.9.9\0Date\0\0";
+    std::memcpy(storage + 24, strings, sizeof(strings));
+
+    System system(conn, "/xyz/openbmc_project/test/inventory/system", storage,
+                  testFilePath);
+    std::string result = system.version("");
+    EXPECT_EQ(result, "v9.9.9");
+}
+
+#ifdef PUBLISH_INVENTORY
+TEST_F(SystemTest, VersionPropagatesMappedServiceDisappearance)
+{
+    FakeMapperForSystem mapper(false);
+    if (!mapper.ok())
+    {
+        GTEST_SKIP() << "fake ObjectMapper unavailable in this environment";
+    }
+
+    uint8_t storage[512] = {0};
+    System system(conn,
+                  "/xyz/openbmc_project/test/inventory/system_missing_service",
+                  storage, testFilePath);
+
+    storage[0] = biosType;
+    storage[1] = 24;
+    storage[4] = 1;
+    storage[5] = 2;
+    const char strings[] = "Vendor\0v8.8.8\0Date\0\0";
+    std::memcpy(storage + 24, strings, sizeof(strings));
+
+    EXPECT_THROW(system.version(""), sdbusplus::exception::SdBusError);
+}
+#endif

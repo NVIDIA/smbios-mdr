@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <ctime>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <limits>
@@ -31,16 +32,14 @@ namespace internal
 constexpr const char* mdrV2Service = "xyz.openbmc_project.Smbios.MDR_V2";
 constexpr const char* mdrV2Interface = "xyz.openbmc_project.Smbios.MDR_V2";
 
-bool syncSmbiosData()
+bool syncSmbiosData(sdbusplus::bus_t& bus)
 {
     bool status = false;
-    sdbusplus::bus_t bus = sdbusplus::bus_t(ipmid_get_sd_bus_connection());
-    sdbusplus::message_t method =
-        bus.new_method_call(mdrV2Service, phosphor::smbios::defaultObjectPath,
-                            mdrV2Interface, "AgentSynchronizeData");
-
     try
     {
+        sdbusplus::message_t method = bus.new_method_call(
+            mdrV2Service, phosphor::smbios::defaultObjectPath, mdrV2Interface,
+            "AgentSynchronizeData");
         sdbusplus::message_t reply = bus.call(method);
         reply.read(status);
     }
@@ -49,6 +48,11 @@ bool syncSmbiosData()
         lg2::error("Error Sync data with service: {E} SERVICE={S} PATH={P}",
                    "E", e.what(), "S", mdrV2Service, "P",
                    phosphor::smbios::defaultObjectPath);
+        return false;
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error("Error preparing SMBIOS sync request: {E}", "E", e.what());
         return false;
     }
 
@@ -62,6 +66,27 @@ bool syncSmbiosData()
 }
 
 } // namespace internal
+
+bool SmbiosBlobHandler::syncSmbiosData()
+{
+    try
+    {
+        sdbusplus::bus_t bus = sdbusplus::bus_t(ipmid_get_sd_bus_connection());
+        return internal::syncSmbiosData(bus);
+    }
+    catch (const sdbusplus::exception_t& e)
+    {
+        lg2::error("Error Sync data with service: {E} SERVICE={S} PATH={P}",
+                   "E", e.what(), "S", internal::mdrV2Service, "P",
+                   phosphor::smbios::defaultObjectPath);
+        return false;
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error("Error preparing SMBIOS sync request: {E}", "E", e.what());
+        return false;
+    }
+}
 
 bool SmbiosBlobHandler::canHandleBlob(const std::string& path)
 {
@@ -188,7 +213,7 @@ bool SmbiosBlobHandler::commit(uint16_t session,
     blobPtr->state &= ~blobs::StateFlags::commit_error;
 
     std::string defaultDir =
-        std::filesystem::path(mdrDefaultFile).parent_path();
+        std::filesystem::path(smbiosFilePath).parent_path();
 
     MDRSMBIOSHeader mdrHdr;
     mdrHdr.dirVer = mdrDirVersion;
@@ -216,7 +241,7 @@ bool SmbiosBlobHandler::commit(uint16_t session,
         }
     }
 
-    std::ofstream smbiosFile(mdrDefaultFile,
+    std::ofstream smbiosFile(smbiosFilePath,
                              std::ios_base::binary | std::ios_base::trunc);
     if (!smbiosFile.good())
     {
@@ -229,18 +254,6 @@ bool SmbiosBlobHandler::commit(uint16_t session,
     smbiosFile.exceptions(std::ofstream::badbit | std::ofstream::failbit);
     try
     {
-        std::ofstream smbiosFile(mdrDefaultFile,
-                                 std::ios_base::binary | std::ios_base::trunc);
-        if (!smbiosFile.good())
-        {
-            phosphor::logging::log<phosphor::logging::level::ERR>(
-                "Write data from flash error - Open SMBIOS table file failure");
-            blobPtr->state |= blobs::StateFlags::commit_error;
-            return false;
-        }
-
-        smbiosFile.exceptions(std::ofstream::badbit | std::ofstream::failbit);
-
         smbiosFile.write(reinterpret_cast<char*>(&mdrHdr),
                          sizeof(MDRSMBIOSHeader));
         smbiosFile.write(reinterpret_cast<char*>(blobPtr->buffer.data()),
@@ -256,7 +269,7 @@ bool SmbiosBlobHandler::commit(uint16_t session,
         return false;
     }
 
-    if (!internal::syncSmbiosData())
+    if (!syncSmbiosData())
     {
         blobPtr->state &= ~blobs::StateFlags::committing;
         blobPtr->state |= blobs::StateFlags::commit_error;

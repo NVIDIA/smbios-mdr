@@ -1,7 +1,12 @@
 ipmi_blob_dep = dependency('phosphor-ipmi-blobs')
 libipmid_dep = dependency('libipmid').partial_dependency(includes: true)
 
-smbiosstore_common_deps = [ipmi_blob_dep, libipmid_dep, sdbusplus_dep]
+smbiosstore_common_deps = [
+    ipmi_blob_dep,
+    libipmid_dep,
+    sdbusplus_dep,
+    phosphor_dbus_interfaces_dep,
+]
 
 shared_module(
     'smbiosstore',

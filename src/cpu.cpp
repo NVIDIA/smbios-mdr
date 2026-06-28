@@ -18,6 +18,7 @@
 
 #include <bitset>
 #include <map>
+#include <utility>
 
 namespace phosphor
 {
@@ -75,7 +76,7 @@ void Cpu::manufacturer(const uint8_t positionNum, const uint8_t structLen,
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
-    asset::manufacturer(result);
+    asset::manufacturer(std::move(result));
 }
 
 void Cpu::partNumber(const uint8_t positionNum, const uint8_t structLen,
@@ -83,7 +84,7 @@ void Cpu::partNumber(const uint8_t positionNum, const uint8_t structLen,
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
-    asset::partNumber(result);
+    asset::partNumber(std::move(result));
 }
 
 void Cpu::serialNumber(const uint8_t positionNum, const uint8_t structLen,
@@ -91,7 +92,7 @@ void Cpu::serialNumber(const uint8_t positionNum, const uint8_t structLen,
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
-    asset::serialNumber(result);
+    asset::serialNumber(std::move(result));
 }
 
 void Cpu::version(const uint8_t positionNum, const uint8_t structLen,
@@ -134,7 +135,7 @@ void Cpu::assetTagString(const uint8_t positionNum, const uint8_t structLen,
                          uint8_t* dataIn)
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
-    assetTagType::assetTag(result);
+    assetTagType::assetTag(std::move(result));
 }
 
 static constexpr uint8_t maxOldVersionCount = 0xff;

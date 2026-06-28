@@ -1,5 +1,7 @@
 #pragma once
 
+#include "smbios_mdrv2.hpp"
+
 #include <blobs-ipmid/blobs.hpp>
 
 #include <cstdint>
@@ -64,6 +66,17 @@ class SmbiosBlobHandler : public GenericBlobInterface
     bool stat(uint16_t session, struct BlobMeta* meta) override;
     bool expire(uint16_t session) override;
 
+    /* Override the destination file for committed SMBIOS data. Only intended
+     * for unit testing; production code uses the mdrDefaultFile default.
+     */
+    void setSmbiosFilePath(const std::string& path)
+    {
+        smbiosFilePath = path;
+    }
+
+  protected:
+    virtual bool syncSmbiosData();
+
   private:
     static constexpr char blobId[] = "/smbios";
 
@@ -72,6 +85,9 @@ class SmbiosBlobHandler : public GenericBlobInterface
 
     /* The handler only allows one open blob. */
     std::unique_ptr<SmbiosBlob> blobPtr = nullptr;
+
+    /* Destination file for committed SMBIOS data. */
+    std::string smbiosFilePath = mdrDefaultFile;
 };
 
 } // namespace blobs

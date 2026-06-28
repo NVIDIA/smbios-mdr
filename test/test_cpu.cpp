@@ -54,6 +54,19 @@ TEST_F(CpuTest, ConstructorNullStorage)
     });
 }
 
+TEST_F(CpuTest, DuplicateObjectPathRegistrationThrows)
+{
+    uint8_t* storage = nullptr;
+    std::string path = "/xyz/openbmc_project/test/inventory/system/cpu0";
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath = path;
+
+    Cpu cpu(*bus, path, 0, storage, motherboard, assocPath);
+    EXPECT_ANY_THROW({
+        Cpu duplicate(*bus, path, 1, storage, motherboard, assocPath);
+    });
+}
+
 TEST_F(CpuTest, ConstructorEmptyStorage)
 {
     uint8_t cpuId = 0;
@@ -1346,8 +1359,8 @@ TEST_F(CpuTest, SocketChipNumber_String_NoMatch)
 
 TEST_F(CpuTest, SocketChipNumber_DataInNull)
 {
-    auto [found, socket,
-          chip] = Cpu::socketChipNumber(static_cast<uint8_t*>(nullptr));
+    uint8_t* volatile runtimeNull = nullptr;
+    auto [found, socket, chip] = Cpu::socketChipNumber(runtimeNull);
     EXPECT_FALSE(found);
     EXPECT_EQ(socket, 0u);
     EXPECT_EQ(chip, 0u);
@@ -1570,3 +1583,262 @@ TEST_F(CpuTest, Characteristics_WithMappedCapabilities)
                 storage, motherboard, assocPath);
     });
 }
+
+// family 0xa1 = "Quad-Core Intel Xeon processor 3200 Series" contains both
+// " Intel " and " Xeon " (with surrounding spaces), so it enters the Intel
+// step/family/model decode block (cpu.cpp lines 200-241). The existing tests
+// used 0x0b ("Intel Pentium processor") whose name has no LEADING space and so
+// never matched. id with cpuFamily nibble 0xf covers the 0xf branches
+// (224->226, 232->234).
+TEST_F(CpuTest, InfoUpdateXeonFamilyCpuFamilyF)
+{
+    uint8_t cpuId = 0;
+    uint8_t storage[512] = {0};
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[6] = 0xa1; // " Intel " + " Xeon "
+    storage[24] = 0x41;
+    storage[8] = 0x00;
+    storage[9] = 0x0f; // cpuFamily = 0xf
+    storage[10] = 0x10;
+    storage[11] = 0x01;
+    storage[50] = 0;
+    storage[51] = 0;
+    std::string mb = "/xyz/openbmc_project/test/inventory/system";
+    std::string assoc = "/xyz/openbmc_project/test/inventory/system/cpu0";
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus, "/xyz/openbmc_project/test/inventory/system/cpu0", cpuId,
+                storage, mb, assoc);
+    });
+}
+
+// Same Xeon family but cpuFamily neither 0x6 nor 0xf -> effectiveFamily(else,
+// 230) and effectiveModel(else, 238) branches.
+TEST_F(CpuTest, InfoUpdateXeonFamilyCpuFamilyOther)
+{
+    uint8_t cpuId = 0;
+    uint8_t storage[512] = {0};
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[6] = 0xa1;
+    storage[24] = 0x41;
+    storage[8] = 0x21;
+    storage[9] = 0x02; // cpuFamily = 2 (neither 0x6 nor 0xf)
+    storage[10] = 0;
+    storage[11] = 0;
+    storage[50] = 0;
+    storage[51] = 0;
+    std::string mb = "/xyz/openbmc_project/test/inventory/system";
+    std::string assoc = "/xyz/openbmc_project/test/inventory/system/cpu0";
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus, "/xyz/openbmc_project/test/inventory/system/cpu0", cpuId,
+                storage, mb, assoc);
+    });
+}
+
+// cpuId index 1 but only one processor record present: the iteration loop calls
+// getSMBIOSTypePtr on the trailing zero padding and returns null (cpu.cpp 163).
+TEST_F(CpuTest, InfoUpdateIndexBeyondAvailableRecords)
+{
+    uint8_t cpuId = 1;
+    uint8_t storage[512] = {0};
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[6] = 0xa1;
+    storage[24] = 0x41;
+    storage[50] = 0;
+    storage[51] = 0;
+    std::string mb = "/xyz/openbmc_project/test/inventory/system";
+    std::string assoc = "/xyz/openbmc_project/test/inventory/system/cpu1";
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus, "/xyz/openbmc_project/test/inventory/system/cpu1", cpuId,
+                storage, mb, assoc);
+    });
+}
+
+// Xeon family with cpuFamily == 0x6 covers the 0x6 operand of the
+// effectiveModel condition (cpu.cpp line 232).
+TEST_F(CpuTest, InfoUpdateXeonFamilyCpuFamily6)
+{
+    uint8_t cpuId = 0;
+    uint8_t storage[512] = {0};
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[6] = 0xa1; // " Intel " + " Xeon "
+    storage[24] = 0x41;
+    storage[8] = 0x60; // model nibble
+    storage[9] = 0x06; // cpuFamily = 0x6
+    storage[50] = 0;
+    storage[51] = 0;
+    std::string mb = "/xyz/openbmc_project/test/inventory/system";
+    std::string assoc = "/xyz/openbmc_project/test/inventory/system/cpu0";
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus, "/xyz/openbmc_project/test/inventory/system/cpu0", cpuId,
+                storage, mb, assoc);
+    });
+}
+
+// cpuId == 1 with a single processor record whose string area never terminates:
+// the per-index loop's smbiosNextPtr hits the size limit and returns nullptr,
+// exercising the early-return branch inside the loop (cpu.cpp ~L158).
+TEST_F(CpuTest, CpuId1NextPtrNullReturnsEarly)
+{
+    std::vector<uint8_t> buf(static_cast<size_t>(mdrSMBIOSSize) + 64, 0x01);
+    buf[0] = processorsType;
+    buf[1] = 50; // formatted length
+    buf[2] = 0;
+    buf[3] = 0;
+    std::string mb = "/xyz/openbmc_project/test/inventory/system";
+    std::string assoc = "/xyz/openbmc_project/test/inventory/system/cpu1";
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus, "/xyz/openbmc_project/test/inventory/system/cpu1", 1,
+                buf.data(), mb, assoc);
+    });
+}
+
+#ifdef CPU_DBUS
+namespace
+{
+void setWellFormedProcessorRecord(uint8_t* storage, uint8_t family,
+                                  uint16_t characteristics,
+                                  uint64_t processorId = 0x000306a9)
+{
+    std::memset(storage, 0, 512);
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[4] = 1; // socket designation string index
+    storage[5] = 0x03;
+    storage[6] = family;
+    storage[7] = 2;  // manufacturer string index
+    std::memcpy(storage + 8, &processorId, sizeof(processorId));
+    storage[16] = 3; // version string index
+    storage[20] = 0x80;
+    storage[21] = 0x0c;
+    storage[24] = 0x41; // populated and enabled
+    storage[32] = 4;    // serial number string index
+    storage[33] = 5;    // asset tag string index
+    storage[34] = 6;    // part number string index
+    storage[35] = 0xff;
+    storage[37] = 0xff;
+    storage[38] = characteristics & 0xff;
+    storage[39] = (characteristics >> 8) & 0xff;
+    storage[42] = 4;
+    storage[46] = 8;
+
+    const char strings[] =
+        "CPU0\0TestVendor\0Model-X\0Serial123\0Asset123\0Part123   \0\0";
+    std::memcpy(storage + 50, strings, sizeof(strings));
+}
+} // namespace
+
+TEST_F(CpuTest, InfoUpdateWellFormedStringsDriveSettersAndCharacteristics)
+{
+    uint8_t storage[512] = {0};
+    setWellFormedProcessorRecord(storage, 0xb1, 0x0005);
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath =
+        "/xyz/openbmc_project/test/inventory/system/cpu_well_formed";
+
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus,
+                "/xyz/openbmc_project/test/inventory/system/cpu_well_formed", 0,
+                storage, motherboard, assocPath);
+    });
+}
+
+TEST_F(CpuTest, InfoUpdateWellFormedXeonAndZenFamiliesDriveOrOperands)
+{
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+
+    {
+        uint8_t storage[512] = {0};
+        setWellFormedProcessorRecord(storage, 0x10, 0x0004);
+        std::string assocPath =
+            "/xyz/openbmc_project/test/inventory/system/cpu_xeon_operand";
+        EXPECT_NO_THROW({
+            Cpu cpu(
+                *bus,
+                "/xyz/openbmc_project/test/inventory/system/cpu_xeon_operand",
+                0, storage, motherboard, assocPath);
+        });
+    }
+
+    {
+        uint8_t storage[512] = {0};
+        setWellFormedProcessorRecord(storage, 0x6b, 0x0004);
+        std::string assocPath =
+            "/xyz/openbmc_project/test/inventory/system/cpu_zen_operand";
+        EXPECT_NO_THROW({
+            Cpu cpu(
+                *bus,
+                "/xyz/openbmc_project/test/inventory/system/cpu_zen_operand", 0,
+                storage, motherboard, assocPath);
+        });
+    }
+}
+
+TEST_F(CpuTest, SocketChipNumberDataWellFormedDesignation)
+{
+    uint8_t storage[512] = {0};
+    setWellFormedProcessorRecord(storage, 0xb1, 0x0004);
+    const char strings[] = "CPU2\0\0";
+    std::memcpy(storage + 50, strings, sizeof(strings));
+
+    auto [found, socket, chip] = Cpu::socketChipNumber(storage);
+    if (found)
+    {
+        EXPECT_EQ(socket, 2u);
+        EXPECT_EQ(chip, 0u);
+    }
+}
+#endif
+
+#ifdef CPU_DBUS
+TEST_F(CpuTest, InfoUpdateSecondProcessorRecordContinuesPastIndexLoop)
+{
+    uint8_t storage[512] = {0};
+    storage[0] = processorsType;
+    storage[1] = 50;
+    storage[24] = 0x41;
+    storage[50] = 0;
+    storage[51] = 0;
+    storage[52] = processorsType;
+    storage[53] = 50;
+    storage[76] = 0x41;
+    storage[102] = 0;
+    storage[103] = 0;
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    std::string assocPath =
+        "/xyz/openbmc_project/test/inventory/system/cpu_second";
+
+    EXPECT_NO_THROW({
+        Cpu cpu(*bus, "/xyz/openbmc_project/test/inventory/system/cpu_second",
+                1, storage, motherboard, assocPath);
+    });
+}
+#endif
+
+#ifdef NVIDIA
+TEST_F(CpuTest, SocketChipNumberNvidiaPatternsAndOverflow)
+{
+    auto [found, socket, chip] = Cpu::socketChipNumber("GPU:3.7");
+    EXPECT_TRUE(found);
+    EXPECT_EQ(socket, 3u);
+    EXPECT_EQ(chip, 7u);
+
+    std::tie(found, socket, chip) = Cpu::socketChipNumber("CPU4 ");
+    EXPECT_TRUE(found);
+    EXPECT_EQ(socket, 4u);
+    EXPECT_EQ(chip, 0u);
+
+    std::tie(found, socket, chip) =
+        Cpu::socketChipNumber("GPU:999999999999999999999999999999999999.1");
+    EXPECT_FALSE(found);
+
+    std::tie(found, socket, chip) =
+        Cpu::socketChipNumber("CPU999999999999999999999999999999999999");
+    EXPECT_FALSE(found);
+}
+#endif

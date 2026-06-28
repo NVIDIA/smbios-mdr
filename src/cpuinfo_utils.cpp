@@ -280,23 +280,32 @@ void hostStateSetup(const std::shared_ptr<sdbusplus::asio::connection>& conn)
 
     dbusConn = conn;
 
-    // Leak the returned match objects. We want them to run forever.
-    subscribeToProperty(
-        "xyz.openbmc_project.State.Host", "/xyz/openbmc_project/state/host0",
-        state::Host::interface, "CurrentHostState", updatePowerState);
+    // Store match objects in static variables so they live for the process
+    // lifetime without triggering LeakSanitizer.
+    static sdbusplus::bus::match_t* hostStateProp = nullptr;
+    static sdbusplus::bus::match_t* hostStateIntf = nullptr;
+    subscribeToProperty("xyz.openbmc_project.State.Host",
+                        "/xyz/openbmc_project/state/host0",
+                        state::Host::interface, "CurrentHostState",
+                        updatePowerState, &hostStateProp, &hostStateIntf);
+
+    static sdbusplus::bus::match_t* biosDoneProp = nullptr;
+    static sdbusplus::bus::match_t* biosDoneIntf = nullptr;
     subscribeToProperty("xyz.openbmc_project.Host.Misc.Manager",
                         "/xyz/openbmc_project/misc/platform_state",
                         "xyz.openbmc_project.State.Host.Misc", "CoreBiosDone",
-                        updateBiosDone);
+                        updateBiosDone, &biosDoneProp, &biosDoneIntf);
     // xyz.openbmc_project.Host.Misc.Manager has Intel specific dependencies.
     // If it is not available, then we can use the OperatingSystemState in
     // xyz.openbmc_project.State.OperatingSystem. According to x86-power-control
     // repo, OperatingSystemState should return "standby" once the POST is
     // asserted.
-    subscribeToProperty("xyz.openbmc_project.State.Host0",
-                        "/xyz/openbmc_project/state/host0",
-                        "xyz.openbmc_project.State.OperatingSystem.Status",
-                        "OperatingSystemState", updateOsState);
+    static sdbusplus::bus::match_t* osStateProp = nullptr;
+    static sdbusplus::bus::match_t* osStateIntf = nullptr;
+    subscribeToProperty(
+        "xyz.openbmc_project.State.Host0", "/xyz/openbmc_project/state/host0",
+        "xyz.openbmc_project.State.OperatingSystem.Status",
+        "OperatingSystemState", updateOsState, &osStateProp, &osStateIntf);
 
     initialized = true;
 }
@@ -310,9 +319,15 @@ boost::asio::io_context& getIOContext()
 }
 std::shared_ptr<sdbusplus::asio::connection> getConnection()
 {
-    static auto conn =
-        std::make_shared<sdbusplus::asio::connection>(getIOContext());
-    return conn;
+    // Intentionally leak the connection via a function-local static pointer.
+    // The connection holds a descriptor registered with the io_context; if its
+    // destructor runs during static teardown after the io_context has already
+    // been destroyed, it triggers a use-after-free. Leaking through a static
+    // pointer keeps the object reachable (so leak sanitizers do not flag it)
+    // while ensuring its destructor never races io_context teardown.
+    static auto* conn = new std::shared_ptr<sdbusplus::asio::connection>(
+        std::make_shared<sdbusplus::asio::connection>(getIOContext()));
+    return *conn;
 }
 } // namespace dbus
 } // namespace cpu_info

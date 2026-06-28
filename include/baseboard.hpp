@@ -19,6 +19,8 @@
 
 #include <phosphor-logging/lg2.hpp>
 
+#include <array>
+
 namespace phosphor
 {
 
@@ -112,18 +114,20 @@ class Baseboard
      */
     std::pair<bool, int> findIndexOfType(const uint16_t& handle)
     {
-        std::map<int, int> typeCount;
+        std::array<int, 256> typeCount{};
         for (const auto& [objHandle, objHeader] : containedObjects)
         {
             if (objHeader == nullptr)
             {
                 continue;
             }
+
+            const auto type = objHeader->type;
             if (handle == objHandle)
             {
-                return {true, typeCount[objHeader->type]};
+                return {true, typeCount[type]};
             }
-            typeCount[objHeader->type]++;
+            typeCount[type]++;
         }
         return {false, 0};
     }
@@ -133,12 +137,12 @@ class Baseboard
         name = newName;
     }
 
-    std::string getName()
+    const std::string& getName() const noexcept
     {
         return name;
     }
 
-    BoardType getType()
+    BoardType getType() const noexcept
     {
         if (raw == nullptr)
         {

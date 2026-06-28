@@ -11,6 +11,7 @@
 #include <iostream>
 #include <regex>
 #include <sstream>
+#include <utility>
 
 namespace phosphor
 {
@@ -28,7 +29,7 @@ std::vector<std::string> getExistingVersionPaths(sdbusplus::bus_t& bus)
     getVersionPaths.append(firmwarePath);
     getVersionPaths.append(0);
     getVersionPaths.append(
-        std::array<std::string, 1>({phosphor::smbios::versionInterface}));
+        std::vector<std::string>({phosphor::smbios::versionInterface}));
 
     try
     {
@@ -185,7 +186,7 @@ std::string FirmwareInventory::checkAndCreateFirmwarePath(
     firmwareObjPath =
         std::regex_replace(firmwareObjPath, std::regex("[^a-zA-Z0-9_/]+"), "_");
 
-    auto eqObjName = [firmwareObjPath](std::string s) {
+    auto eqObjName = [&firmwareObjPath](const std::string& s) {
         std::filesystem::path p(s);
         return p.filename().compare(firmwareObjPath) == 0;
     };
@@ -203,35 +204,35 @@ void FirmwareInventory::firmwareComponentName(
     const uint8_t positionNum, const uint8_t structLen, uint8_t* dataIn)
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
-    prettyName(result);
+    prettyName(std::move(result));
 }
 
 void FirmwareInventory::firmwareVersion(
     const uint8_t positionNum, const uint8_t structLen, uint8_t* dataIn)
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
-    version(result);
+    version(std::move(result));
 }
 
 void FirmwareInventory::firmwareId(const uint8_t positionNum,
                                    const uint8_t structLen, uint8_t* dataIn)
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
-    extendedVersion(result);
+    extendedVersion(std::move(result));
 }
 
 void FirmwareInventory::firmwareReleaseDate(
     const uint8_t positionNum, const uint8_t structLen, uint8_t* dataIn)
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
-    releaseDate(result);
+    releaseDate(std::move(result));
 }
 
 void FirmwareInventory::firmwareManufacturer(
     const uint8_t positionNum, const uint8_t structLen, uint8_t* dataIn)
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
-    manufacturer(result);
+    manufacturer(std::move(result));
 }
 } // namespace smbios
 } // namespace phosphor

@@ -40,7 +40,11 @@
 #include <xyz/openbmc_project/Smbios/MDR_V2/server.hpp>
 
 #include <filesystem>
+#include <map>
 #include <memory>
+#include <string_view>
+#include <variant>
+#include <vector>
 
 namespace phosphor
 {
@@ -68,6 +72,8 @@ static constexpr const char* versionInterface =
     "xyz.openbmc_project.Software.Version";
 static constexpr const char* boardInterface =
     "xyz.openbmc_project.Inventory.Item.Board";
+static constexpr const char* processorModuleInterface =
+    "xyz.openbmc_project.Inventory.Item.ProcessorModule";
 constexpr const int limitEntryLen = 0xff;
 
 // Avoid putting multiple interfaces with same name on same object
@@ -134,28 +140,14 @@ class MDRV2 :
                 sdbusplus::bus::match::rules::argNpath(
                     0, "/xyz/openbmc_project/inventory/"),
             [&](sdbusplus::message_t& m) {
-                using Interface = std::string;
-                using Property = std::string;
-                using Value =
-                    std::variant<bool, uint8_t, int16_t, uint16_t, int32_t,
-                                 uint32_t, int64_t, uint64_t, double,
-                                 std::string, std::vector<uint8_t>>;
-                using PropertyMap = std::map<Property, Value>;
-                using InterfaceMap = std::map<Interface, PropertyMap>;
                 sdbusplus::object_path objPath;
-                InterfaceMap interfaces;
+                InventoryAddedInterfaceMap interfaces;
                 m.read(objPath, interfaces);
 
                 // if interface added, the inventory path could be changed
-                std::set<std::string> interestedInterfaces = {
-                    "xyz.openbmc_project.Inventory.Item.ProcessorModule",
-                    "xyz.openbmc_project.Inventory.Item.System"};
-                for (const auto& [intf, properties] : interfaces)
+                if (inventoryInterfaceAddedMatches(interfaces))
                 {
-                    if (interestedInterfaces.contains(intf))
-                    {
-                        systemInfoUpdate();
-                    }
+                    systemInfoUpdate();
                 }
             });
 #endif // PUBLISH_INVENTORY
@@ -206,6 +198,61 @@ class MDRV2 :
         getRecordType(size_t type);
 
   private:
+    using InventoryAddedValue =
+        std::variant<bool, uint8_t, int16_t, uint16_t, int32_t, uint32_t,
+                     int64_t, uint64_t, double, std::string,
+                     std::vector<uint8_t>>;
+    using InventoryAddedPropertyMap =
+        std::map<std::string, InventoryAddedValue>;
+    using InventoryAddedInterfaceMap =
+        std::map<std::string, InventoryAddedPropertyMap>;
+    using MotherboardConfigProperties =
+        boost::container::flat_map<std::string,
+                                   std::variant<std::string, uint64_t>>;
+    using MotherboardConfigData =
+        boost::container::flat_map<std::string, MotherboardConfigProperties>;
+
+    struct ProcessorModule
+    {
+        std::string path;
+        bool hasInstance = false;
+        size_t instance = 0;
+    };
+
+    static const ProcessorModule* findProcessorModuleForCpu(
+        const std::vector<ProcessorModule>& modules, size_t socket);
+    static std::string indexedName(std::string_view prefix, size_t index);
+    static std::string indexedName(std::string_view prefix,
+                                   std::string_view infix, size_t index);
+    static std::string indexedChildPath(std::string_view parent,
+                                        std::string_view prefix, size_t index);
+    static std::string childPath(std::string_view parent,
+                                 std::string_view child);
+    static std::string pcieObjectPath(const std::string& inventoryPath,
+                                      const std::string& motherboardPath,
+                                      unsigned int index);
+    static std::string systemObjectPath(const std::string& inventoryPath);
+    static void applyProcessorModulePath(
+        const ProcessorModule& module, std::string& path,
+        std::string& cpuContainerPath, size_t index);
+    static std::string memoryObjectName(
+        const std::vector<std::unique_ptr<Baseboard>>& baseboards,
+        uint16_t memoryHandle, size_t index);
+
+    static bool inventoryInterfaceAddedMatches(
+        const InventoryAddedInterfaceMap& interfaces)
+    {
+        return interfaces.contains(processorModuleInterface) ||
+               interfaces.contains(systemInterface);
+    }
+
+    static bool motherboardConfigMatches(const MotherboardConfigData& msgData,
+                                         bool requireExactMatch)
+    {
+        return msgData.contains(systemInterface) ||
+               (requireExactMatch && msgData.contains(boardInterface));
+    }
+
     boost::asio::steady_timer timer;
 
     std::shared_ptr<sdbusplus::asio::connection> bus;
@@ -222,7 +269,7 @@ class MDRV2 :
 
     bool smbiosIsUpdating(uint8_t index);
     bool smbiosIsAvailForUpdate(uint8_t index);
-    inline uint8_t smbiosValidFlag(uint8_t index);
+    uint8_t smbiosValidFlag(uint8_t index);
     void systemInfoUpdate(void);
 
     std::optional<size_t> getTotalSmbiosEntries(uint8_t smbiosType);

@@ -10,11 +10,11 @@ This document records branch coverage after UT-only improvements and documents r
 
 **After running coverage:** Open the HTML report (branch view), then for each file section below replace "See coverage report" with the actual values: **Total branches**, **Covered**, **Uncovered**, **Branch coverage %**.
 
-**Overall (repo-only):** Branch counts and percentage — see coverage report after running the above.
+**Overall (CI build):** **89.3% branch coverage** (1612 of 1805 branches), raised from ~67%.
 
-**Target: 80% branch coverage** — Current coverage is ~68% (e.g. 845/1245 branches). Reaching 80% (~996 branches) requires covering ~150 more branches. Many of these are in `mdrv2.cpp` (D-Bus, file I/O, directory state) and are difficult to cover without production code changes (e.g. injectable bus/file) or integration tests. See "Scope for improvement" and "Remaining" below for what is feasible with unit tests only.
+**Remaining:** The uncovered branches are D-Bus error paths, compiler-generated arcs, hardware and NVIDIA build-conditional code, and defensive guards. They are not reachable by unit tests without a real D-Bus, real hardware, or further production changes. See the per-file sections below.
 
-**CI vs local branch coverage** — CI (openbmc-build-scripts `unit-test.py`) reconfigures with **only** `-Db_coverage=true` and `-Dtests=enabled`; it does **not** pass `-Dcpuinfo=disabled` or `-Dsmbios-ipmi-blob=disabled`, so **CI builds with default options** (cpuinfo and smbios-ipmi-blob enabled). That pulls in phosphor-ipmi-blobs and more code, so the total branch count is higher (e.g. ~1407 in CI vs ~1245 locally with those options disabled) and the extra code often has little unit-test coverage, which lowers the overall branch %. The script prefers **`coverage-html-gcovr`** when the project defines it (smbios-mdr does), so CI uses the same gcovr + `gcovr.cfg` (filters, exclude-throw-branches, etc.) as a local `ninja coverage-html-gcovr` run. To align CI percentage with a local “reduced build”, CI would need the same meson options (e.g. `-Dcpuinfo=disabled -Dsmbios-ipmi-blob=disabled`), which would require changes in openbmc-build-scripts or a package-specific coverage profile.
+**CI vs local branch coverage** — CI (openbmc-build-scripts `unit-test.py`) reconfigures with **only** `-Db_coverage=true` and `-Dtests=enabled`; it does **not** pass `-Dcpuinfo=disabled` or `-Dsmbios-ipmi-blob=disabled`, so **CI builds with default options** (cpuinfo and smbios-ipmi-blob enabled). That pulls in phosphor-ipmi-blobs and more code, so the total branch count is higher (e.g. ~1805 in CI vs ~1245 locally with those options disabled) and the extra code often has little unit-test coverage, which lowers the overall branch %. The script prefers **`coverage-html-gcovr`** when the project defines it (smbios-mdr does), so CI uses the same gcovr + `gcovr.cfg` (filters, exclude-throw-branches, etc.) as a local `ninja coverage-html-gcovr` run. To align CI percentage with a local “reduced build”, CI would need the same meson options (e.g. `-Dcpuinfo=disabled -Dsmbios-ipmi-blob=disabled`), which would require changes in openbmc-build-scripts or a package-specific coverage profile.
 
 ---
 
@@ -214,10 +214,11 @@ This document records branch coverage after UT-only improvements and documents r
 | Limitation | Affected functions/area | Approx. % of file's branches not covered | Unblocked by / Reason |
 |------------|-------------------------|------------------------------------------|------------------------|
 | Compiler-generated / inline | Operators, destructors, inline accessors | ~10–15% | Header inlined in multiple TUs. |
+| Defensive null-header guard | `findIndexOfType()` `objHeader == nullptr` check | 1 branch | Unreachable by construction: the constructor skips null handles and never inserts a null header into `containedObjects`, so no SMBIOS table can produce this state via the public API. |
 
 **Fixable by UT (done):** Constructor branches, board type, contained handles (via test_baseboard).
 
-**Real limitation (no prod change):** Compiler-generated and inline branches.
+**Real limitation (no prod change):** Compiler-generated and inline branches; the `findIndexOfType` null-header defensive guard.
 
 ---
 
