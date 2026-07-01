@@ -331,9 +331,14 @@ class Cpu :
                                 assetTagType, instance>
 #else
 class Cpu :
-    sdbusplus::server::object_t<processor, asset, location, connector, rev,
-                                Item, association, operationalStatus,
-                                assetTagType, instance, chassis>
+    sdbusplus::server::object_t<
+        processor, asset, location, connector, rev, Item, association,
+        operationalStatus, assetTagType, instance
+#ifdef CPU_DBUS_CHASSISIFACE
+        ,
+        chassis
+#endif
+        >
 #endif
 {
   public:
@@ -352,10 +357,14 @@ class Cpu :
                                     Item, association, operationalStatus,
                                     assetTagType, instance>(bus, path.c_str()),
 #else
-        sdbusplus::server::object_t<processor, asset, location, connector, rev,
-                                    Item, association, operationalStatus,
-                                    assetTagType, instance, chassis>(
-            bus, path.c_str()),
+        sdbusplus::server::object_t<
+            processor, asset, location, connector, rev, Item, association,
+            operationalStatus, assetTagType, instance
+#ifdef CPU_DBUS_CHASSISIFACE
+            ,
+            chassis
+#endif
+            >(bus, path.c_str()),
 #endif
         cpuNum(cpuId), storage(smbiosTableStorage),
         motherboardPath(motherboard), objPath(assocPath)
