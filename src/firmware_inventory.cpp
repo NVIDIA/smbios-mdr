@@ -5,6 +5,7 @@
 
 #include <boost/algorithm/string.hpp>
 
+#include <cstddef>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -120,6 +121,18 @@ std::string FirmwareInventory::checkAndCreateFirmwarePath(
 #endif
     if (firmwareInfo->numOfAssociatedComponents > 0)
     {
+        constexpr size_t handlesOffset =
+            offsetof(FirmwareInfo, associatedComponentHandles);
+        if (static_cast<size_t>(firmwareInfo->length) <
+            handlesOffset + 2u * firmwareInfo->numOfAssociatedComponents)
+        {
+            lg2::error("Type-45 length {LEN} too small for {N} "
+                       "associated component handles",
+                       "LEN", firmwareInfo->length, "N",
+                       firmwareInfo->numOfAssociatedComponents);
+            return "";
+        }
+
         for (int i = 0; i < firmwareInfo->numOfAssociatedComponents; i++)
         {
             auto component = smbiosHandlePtr(
