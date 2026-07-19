@@ -435,7 +435,8 @@ class Cpu :
         return std::make_tuple(found, socket, chip);
     }
 
-    static inline auto socketChipNumber(uint8_t* dataIn)
+    static inline auto socketChipNumber(uint8_t* dataIn,
+                                        const uint8_t* dataEnd = nullptr)
     {
         bool found = false;
         size_t socket = 0;
@@ -448,7 +449,7 @@ class Cpu :
 
         auto cpuInfo = reinterpret_cast<struct Cpu::ProcessorInfo*>(dataIn);
         std::string socketDesignation = positionToString(
-            cpuInfo->socketDesignation, cpuInfo->length, dataIn);
+            cpuInfo->socketDesignation, cpuInfo->length, dataIn, dataEnd);
         return socketChipNumber(socketDesignation);
     }
 

@@ -19,7 +19,9 @@
 
 #include <phosphor-logging/lg2.hpp>
 
+#include <algorithm>
 #include <array>
+#include <cstddef>
 
 namespace phosphor
 {
@@ -80,7 +82,9 @@ class Baseboard
         name = "Board_" + std::to_string(index);
 
         uint8_t* dataIn = storage;
-        dataIn = getSMBIOSTypeIndexPtr(dataIn, baseboardType, index);
+        dataIn = getSMBIOSTypeIndexPtr(dataIn, baseboardType, index,
+                                       sizeof(BaseboardInfo),
+                                       storage + smbiosTableStorageSize);
         if (dataIn == nullptr)
         {
             lg2::error("Failed to find baseboard info. index={INDEX}", "INDEX",
@@ -89,10 +93,20 @@ class Baseboard
         }
 
         raw = reinterpret_cast<struct BaseboardInfo*>(dataIn);
-        for (int i = 0; i < raw->numOfContainedObject; i++)
+        // Bound host-controlled count by the record's declared length.
+        constexpr size_t handlesOffset =
+            offsetof(BaseboardInfo, containedObjectHandles);
+        const size_t maxHandles =
+            (raw->length > handlesOffset)
+                ? (raw->length - handlesOffset) / sizeof(uint16_t)
+                : 0;
+        const size_t objectCount =
+            std::min<size_t>(raw->numOfContainedObject, maxHandles);
+        for (size_t i = 0; i < objectCount; i++)
         {
             auto objectHanle = raw->containedObjectHandles[i];
-            uint8_t* objectData = smbiosHandlePtr(storage, objectHanle);
+            uint8_t* objectData = smbiosHandlePtr(
+                storage, objectHanle, storage + smbiosTableStorageSize);
             if (objectData == nullptr)
             {
                 lg2::error("Failed to find handle. Handle={HANDLE}", "HANDLE",

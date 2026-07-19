@@ -31,7 +31,8 @@ namespace smbios
 void chassisCpu::locationString(const uint8_t positionNum,
                                 const uint8_t structLen, uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
 
     location::locationCode(std::move(result));
 }
@@ -39,7 +40,8 @@ void chassisCpu::locationString(const uint8_t positionNum,
 void chassisCpu::manufacturer(const uint8_t positionNum,
                               const uint8_t structLen, uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
 
     asset::manufacturer(std::move(result));
 }
@@ -47,7 +49,8 @@ void chassisCpu::manufacturer(const uint8_t positionNum,
 void chassisCpu::partNumber(const uint8_t positionNum, const uint8_t structLen,
                             uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
 
     asset::partNumber(std::move(result));
 }
@@ -55,7 +58,8 @@ void chassisCpu::partNumber(const uint8_t positionNum, const uint8_t structLen,
 void chassisCpu::serialNumber(const uint8_t positionNum,
                               const uint8_t structLen, uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
 
     asset::serialNumber(std::move(result));
 }
@@ -63,7 +67,8 @@ void chassisCpu::serialNumber(const uint8_t positionNum,
 void chassisCpu::assetTagString(const uint8_t positionNum,
                                 const uint8_t structLen, uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
 
     assetTagType::assetTag(std::move(result));
 }
@@ -73,7 +78,8 @@ void chassisCpu::model(const uint8_t positionNum, const uint8_t structLen,
 {
     std::string result;
 
-    result = positionToString(positionNum, structLen, dataIn);
+    result = positionToString(positionNum, structLen, dataIn,
+                              storage + smbiosTableStorageSize);
 
     if (IS_COPY_CPU_VERSION_TO_MODEL == true)
     {
@@ -90,7 +96,9 @@ void chassisCpu::infoUpdate(uint8_t* smbiosTableStorage,
 
     uint8_t* dataIn = storage;
 
-    dataIn = getSMBIOSTypePtr(dataIn, processorsType);
+    dataIn = getSMBIOSTypePtr(dataIn, processorsType,
+                              sizeof(chassisCpu::ProcessorInfo),
+                              storage + smbiosTableStorageSize);
     if (dataIn == nullptr)
     {
         return;
@@ -98,12 +106,14 @@ void chassisCpu::infoUpdate(uint8_t* smbiosTableStorage,
 
     for (uint8_t index = 0; index < cpuNum; index++)
     {
-        dataIn = smbiosNextPtr(dataIn);
+        dataIn = smbiosNextPtr(dataIn, storage + smbiosTableStorageSize);
         if (dataIn == nullptr)
         {
             return;
         }
-        dataIn = getSMBIOSTypePtr(dataIn, processorsType);
+        dataIn = getSMBIOSTypePtr(dataIn, processorsType,
+                                  sizeof(chassisCpu::ProcessorInfo),
+                                  storage + smbiosTableStorageSize);
         if (dataIn == nullptr)
         {
             return;

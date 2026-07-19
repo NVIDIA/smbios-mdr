@@ -5,6 +5,7 @@
 
 #include <boost/algorithm/string.hpp>
 
+#include <algorithm>
 #include <cstddef>
 #include <fstream>
 #include <iomanip>
@@ -46,27 +47,29 @@ std::vector<std::string> getExistingVersionPaths(sdbusplus::bus_t& bus)
 }
 } // namespace utils
 
-bool FirmwareInventory::getFirmwareInventoryData(uint8_t*& dataIn,
-                                                 int inventoryIndex)
+bool FirmwareInventory::getFirmwareInventoryData(
+    uint8_t*& dataIn, int inventoryIndex, const uint8_t* dataEnd)
 {
     constexpr int maxFirmwareInventoryEntries = 255;
     if (inventoryIndex < 0 || inventoryIndex > maxFirmwareInventoryEntries)
     {
         return false;
     }
-    dataIn = getSMBIOSTypePtr(dataIn, firmwareInventoryInformationType);
+    dataIn = getSMBIOSTypePtr(dataIn, firmwareInventoryInformationType,
+                              sizeof(FirmwareInfo), dataEnd);
     if (dataIn == nullptr)
     {
         return false;
     }
     for (uint8_t index = 0; index < inventoryIndex; index++)
     {
-        dataIn = smbiosNextPtr(dataIn);
+        dataIn = smbiosNextPtr(dataIn, dataEnd);
         if (dataIn == nullptr)
         {
             return false;
         }
-        dataIn = getSMBIOSTypePtr(dataIn, firmwareInventoryInformationType);
+        dataIn = getSMBIOSTypePtr(dataIn, firmwareInventoryInformationType,
+                                  sizeof(FirmwareInfo), dataEnd);
         if (dataIn == nullptr)
         {
             return false;
@@ -78,7 +81,8 @@ bool FirmwareInventory::getFirmwareInventoryData(uint8_t*& dataIn,
 void FirmwareInventory::firmwareInfoUpdate(uint8_t* smbiosTableStorage)
 {
     uint8_t* dataIn = smbiosTableStorage;
-    if (!getFirmwareInventoryData(dataIn, firmwareInventoryIndex))
+    if (!getFirmwareInventoryData(dataIn, firmwareInventoryIndex,
+                                  storage + smbiosTableStorageSize))
     {
         lg2::info("Failed to get data for firmware inventory index {I}", "I",
                   firmwareInventoryIndex);
@@ -103,17 +107,19 @@ std::string FirmwareInventory::checkAndCreateFirmwarePath(
     uint8_t* dataIn, int inventoryIndex,
     std::vector<std::string>& existingVersionPaths)
 {
-    if (!getFirmwareInventoryData(dataIn, inventoryIndex))
+    // dataIn is the buffer base on entry; capture the end before it advances.
+    const uint8_t* dataEnd = dataIn + smbiosTableStorageSize;
+    if (!getFirmwareInventoryData(dataIn, inventoryIndex, dataEnd))
     {
         lg2::info("Failed to get data for firmware inventory index {I}", "I",
                   inventoryIndex);
         return "";
     }
     auto firmwareInfo = reinterpret_cast<struct FirmwareInfo*>(dataIn);
-    std::string firmwareId =
-        positionToString(firmwareInfo->id, firmwareInfo->length, dataIn);
+    std::string firmwareId = positionToString(
+        firmwareInfo->id, firmwareInfo->length, dataIn, dataEnd);
     auto firmwareName = positionToString(firmwareInfo->componentName,
-                                         firmwareInfo->length, dataIn);
+                                         firmwareInfo->length, dataIn, dataEnd);
     firmwareName = filterFirmwareName(firmwareName);
     if (firmwareName.empty())
     {
@@ -142,7 +148,7 @@ std::string FirmwareInventory::checkAndCreateFirmwarePath(
         for (int i = 0; i < firmwareInfo->numOfAssociatedComponents; i++)
         {
             auto component = smbiosHandlePtr(
-                dataIn, firmwareInfo->associatedComponentHandles[i]);
+                dataIn, firmwareInfo->associatedComponentHandles[i], dataEnd);
             if (component == nullptr)
             {
                 continue;
@@ -156,7 +162,7 @@ std::string FirmwareInventory::checkAndCreateFirmwarePath(
                 case onboardDevicesExtended:
                 {
                     auto designation = positionToString(
-                        component[4], header->length, component);
+                        component[4], header->length, component, dataEnd);
                     if (!designation.empty())
                     {
                         firmwareObjPath.append("_").append(designation);
@@ -165,8 +171,8 @@ std::string FirmwareInventory::checkAndCreateFirmwarePath(
                 }
                 case systemPowerSupply:
                 {
-                    auto location = positionToString(component[5],
-                                                     header->length, component);
+                    auto location = positionToString(
+                        component[5], header->length, component, dataEnd);
                     if (!location.empty())
                     {
                         firmwareObjPath.append("_").append(location);
@@ -203,35 +209,40 @@ std::string FirmwareInventory::checkAndCreateFirmwarePath(
 void FirmwareInventory::firmwareComponentName(
     const uint8_t positionNum, const uint8_t structLen, uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
     prettyName(std::move(result));
 }
 
 void FirmwareInventory::firmwareVersion(
     const uint8_t positionNum, const uint8_t structLen, uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
     version(std::move(result));
 }
 
 void FirmwareInventory::firmwareId(const uint8_t positionNum,
                                    const uint8_t structLen, uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
     extendedVersion(std::move(result));
 }
 
 void FirmwareInventory::firmwareReleaseDate(
     const uint8_t positionNum, const uint8_t structLen, uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
     releaseDate(std::move(result));
 }
 
 void FirmwareInventory::firmwareManufacturer(
     const uint8_t positionNum, const uint8_t structLen, uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
     manufacturer(std::move(result));
 }
 } // namespace smbios
