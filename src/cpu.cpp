@@ -27,7 +27,8 @@ namespace smbios
 void Cpu::socket(const uint8_t positionNum, const uint8_t structLen,
                  uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
 
     processor::socket(result);
 
@@ -73,7 +74,8 @@ void Cpu::family(const uint8_t family, const uint16_t family2)
 void Cpu::manufacturer(const uint8_t positionNum, const uint8_t structLen,
                        uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
 
     asset::manufacturer(result);
 }
@@ -81,7 +83,8 @@ void Cpu::manufacturer(const uint8_t positionNum, const uint8_t structLen,
 void Cpu::partNumber(const uint8_t positionNum, const uint8_t structLen,
                      uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
 
     asset::partNumber(result);
 }
@@ -89,7 +92,8 @@ void Cpu::partNumber(const uint8_t positionNum, const uint8_t structLen,
 void Cpu::serialNumber(const uint8_t positionNum, const uint8_t structLen,
                        uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
 
     asset::serialNumber(result);
 }
@@ -99,7 +103,8 @@ void Cpu::version(const uint8_t positionNum, const uint8_t structLen,
 {
     std::string result;
 
-    result = positionToString(positionNum, structLen, dataIn);
+    result = positionToString(positionNum, structLen, dataIn,
+                              storage + smbiosTableStorageSize);
 
     rev::version(result);
 
@@ -133,7 +138,8 @@ void Cpu::characteristics(uint16_t value)
 void Cpu::assetTagString(const uint8_t positionNum, const uint8_t structLen,
                          uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
     assetTagType::assetTag(result);
 }
 
@@ -146,7 +152,8 @@ void Cpu::infoUpdate(uint8_t* smbiosTableStorage,
 
     uint8_t* dataIn = storage;
 
-    dataIn = getSMBIOSTypePtr(dataIn, processorsType);
+    dataIn = getSMBIOSTypePtr(dataIn, processorsType, sizeof(ProcessorInfo),
+                              storage + smbiosTableStorageSize);
     if (dataIn == nullptr)
     {
         return;
@@ -154,12 +161,13 @@ void Cpu::infoUpdate(uint8_t* smbiosTableStorage,
 
     for (uint8_t index = 0; index < cpuNum; index++)
     {
-        dataIn = smbiosNextPtr(dataIn);
+        dataIn = smbiosNextPtr(dataIn, storage + smbiosTableStorageSize);
         if (dataIn == nullptr)
         {
             return;
         }
-        dataIn = getSMBIOSTypePtr(dataIn, processorsType);
+        dataIn = getSMBIOSTypePtr(dataIn, processorsType, sizeof(ProcessorInfo),
+                                  storage + smbiosTableStorageSize);
         if (dataIn == nullptr)
         {
             return;

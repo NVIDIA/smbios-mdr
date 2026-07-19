@@ -145,3 +145,15 @@ TEST(Baseboard, BoardTypeEnumValues)
     EXPECT_EQ(static_cast<uint8_t>(Baseboard::BoardType::Motherboard), 10);
     EXPECT_EQ(static_cast<uint8_t>(Baseboard::BoardType::ProcessorModule), 6);
 }
+
+TEST(Baseboard, ContainedObjectsClampedByLength)
+{
+    uint8_t storage[256] = {0};
+    // Declared length only covers a single contained-object handle, but the
+    // count claims 4; the loop is clamped to what the record actually holds
+    // instead of reading past it.
+    setBaseboardTable(storage, 0, 5, 4, 0x9999);
+
+    Baseboard bb(0, storage);
+    EXPECT_EQ(bb.getName(), "Board_0");
+}

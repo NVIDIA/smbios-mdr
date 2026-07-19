@@ -590,3 +590,17 @@ TEST_F(FirmwareInventoryTest,
     EXPECT_TRUE(result.find("/xyz/openbmc_project/software") !=
                 std::string::npos);
 }
+
+TEST_F(FirmwareInventoryTest, CheckAndCreateFirmwarePathTypeLengthTooSmall)
+{
+    uint8_t storage[512] = {0};
+    // Declared length (30) cannot hold 4 associated-component handles; the
+    // record is rejected before the handle loop reads past it.
+    setupFirmwareInfoStructure(storage, 0, "CustomFW", "v1.0", "FW001",
+                               "2024-01-01", "Manufacturer", 4);
+
+    std::vector<std::string> existingPaths;
+    std::string result = FirmwareInventory::checkAndCreateFirmwarePath(
+        storage, 0, existingPaths);
+    EXPECT_TRUE(result.empty());
+}

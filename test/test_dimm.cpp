@@ -943,12 +943,51 @@ TEST_F(DimmTest, DeviceLocatorCpuStringInvalidNumber)
 
     std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
 
-    EXPECT_THROW(
-        {
-            Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0",
-                      0, storage.data(), motherboard);
-        },
-        std::exception);
+    // A non-numeric CPU number in the device locator must be handled
+    // gracefully (std::stoi's std::invalid_argument is caught) instead of
+    // propagating out of the constructor and crashing the daemon.
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0", 0,
+                  storage.data(), motherboard);
+    });
+}
+
+TEST_F(DimmTest, MemoryDeviceShortLengthRejected)
+{
+    auto storage = createSMBIOSMemoryDevice();
+    // Declared record length shorter than the parsed MemoryInfo struct: the
+    // size guard rejects it and the DIMM is left unpopulated (no crash).
+    storage[1] = 8;
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0", 0,
+                  storage.data(), motherboard);
+    });
+}
+
+TEST_F(DimmTest, DeviceLocatorStringUnterminatedBounded)
+{
+    // Full-size backing buffer with no string terminator anywhere after the
+    // record: every walk and string read is bounded by the real buffer end
+    // instead of running past it, and returns empty without crashing.
+    std::vector<uint8_t> storage(smbiosTableStorageSize, 0xFF);
+    struct MemoryInfo memInfo{};
+    memInfo.type = memoryDeviceType;
+    memInfo.length = sizeof(MemoryInfo);
+    memInfo.handle = 0x1000;
+    memInfo.deviceLocator = 1;
+    memInfo.bankLocator = 0;
+    memInfo.manufacturer = 0;
+    memInfo.serialNum = 0;
+    memInfo.assetTag = 0;
+    memInfo.partNum = 0;
+    std::memcpy(storage.data(), &memInfo, sizeof(MemoryInfo));
+
+    std::string motherboard = "/xyz/openbmc_project/test/inventory/system";
+    EXPECT_NO_THROW({
+        Dimm dimm(*bus, "/xyz/openbmc_project/test/inventory/system/dimm0", 0,
+                  storage.data(), motherboard);
+    });
 }
 
 TEST_F(DimmTest, DeviceLocatorDimmSingleLetter)
