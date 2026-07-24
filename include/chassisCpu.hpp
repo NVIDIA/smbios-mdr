@@ -129,16 +129,16 @@ class chassisCpu :
 
     void locationString(const uint8_t positionNum, const uint8_t structLen,
                         uint8_t* dataIn);
-    void manufacturer(const uint8_t positionNum, const uint8_t structLen,
-                      uint8_t* dataIn);
-    void serialNumber(const uint8_t positionNum, const uint8_t structLen,
-                      uint8_t* dataIn);
+    void populateManufacturer(const uint8_t positionNum,
+                              const uint8_t structLen, uint8_t* dataIn);
+    void populateSerialNumber(const uint8_t positionNum,
+                              const uint8_t structLen, uint8_t* dataIn);
     void assetTagString(const uint8_t positionNum, const uint8_t structLen,
                         uint8_t* dataIn);
-    void partNumber(const uint8_t positionNum, const uint8_t structLen,
-                    uint8_t* dataIn);
-    void model(const uint8_t positionNum, const uint8_t structLen,
-               uint8_t* dataIn);
+    void populatePartNumber(const uint8_t positionNum, const uint8_t structLen,
+                            uint8_t* dataIn);
+    void populateModel(const uint8_t positionNum, const uint8_t structLen,
+                       uint8_t* dataIn);
 };
 
 } // namespace smbios

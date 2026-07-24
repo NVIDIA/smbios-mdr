@@ -18,6 +18,7 @@
 #include "config.h"
 
 #include <phosphor-logging/elog-errors.hpp>
+#include <phosphor-logging/lg2.hpp>
 
 #include <array>
 #include <filesystem>
@@ -188,6 +189,9 @@ static constexpr const char* dimmSuffix = "/chassis/motherboard/dimm";
 
 static constexpr const char* pcieSuffix = "/chassis/motherboard/pcieslot";
 
+static constexpr const char* pcieDeviceSuffix =
+    "/chassis/motherboard/pciedevice";
+
 static constexpr const char* systemSuffix = "/chassis/motherboard/bios";
 
 static constexpr const char* tpmSuffix = "/chassis/motherboard/tpm";
@@ -226,6 +230,8 @@ typedef enum
 } SmbiosType;
 
 static constexpr uint8_t separateLen = 2;
+
+static inline uint8_t* smbiosSkipEntryPoint(uint8_t* smbiosDataIn);
 
 static inline uint8_t* smbiosNextPtr(uint8_t* smbiosDataIn)
 {
@@ -271,8 +277,9 @@ static inline uint8_t* smbiosSkipEntryPoint(uint8_t* smbiosDataIn)
     return smbiosDataIn;
 }
 
-// When first time run getSMBIOSTypePtr, need to send the RegionS[].regionData
-// to smbiosDataIn
+// smbiosDataIn may point to the raw SMBIOS MDR region data or to an
+// already-advanced SMBIOS structure. Skip an SMBIOS entry point when present
+// before scanning for the requested type.
 static inline uint8_t* getSMBIOSTypePtr(uint8_t* smbiosDataIn, uint8_t typeId,
                                         size_t size = 0)
 {
@@ -280,34 +287,35 @@ static inline uint8_t* getSMBIOSTypePtr(uint8_t* smbiosDataIn, uint8_t typeId,
     {
         return nullptr;
     }
-    smbiosDataIn = smbiosSkipEntryPoint(smbiosDataIn);
-    char* smbiosData = reinterpret_cast<char*>(smbiosDataIn);
+    uint8_t* smbiosData = smbiosSkipEntryPoint(smbiosDataIn);
 
     while ((*smbiosData != '\0') || (*(smbiosData + 1) != '\0'))
     {
         uint32_t len = *(smbiosData + 1);
         if (*smbiosData != typeId)
         {
-            smbiosData += len;
-            while ((*smbiosData != '\0') || (*(smbiosData + 1) != '\0'))
+            smbiosData = smbiosNextPtr(smbiosData);
+            if (smbiosData == nullptr)
             {
-                smbiosData++;
-                len++;
-                if (len >= mdrSMBIOSSize) // To avoid endless loop
-                {
-                    return nullptr;
-                }
+                return nullptr;
             }
-            smbiosData += separateLen;
             continue;
         }
         if (len < size)
         {
-            phosphor::logging::log<phosphor::logging::level::ERR>(
-                "Record size mismatch!");
-            return nullptr;
+            // Skip undersized entry, same as type-mismatch path above
+            lg2::warning(
+                "SMBIOS type {TYPE} entry too short ({LEN} < {MIN}), skipping",
+                "TYPE", static_cast<uint8_t>(*smbiosData), "LEN", len, "MIN",
+                size);
+            smbiosData = smbiosNextPtr(smbiosData);
+            if (smbiosData == nullptr)
+            {
+                return nullptr;
+            }
+            continue;
         }
-        return reinterpret_cast<uint8_t*>(smbiosData);
+        return smbiosData;
     }
     return nullptr;
 }

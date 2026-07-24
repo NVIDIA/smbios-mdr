@@ -312,9 +312,7 @@ TEST(CpuinfoUtilsHostState, EnumValues)
 
 TEST(CpuinfoUtilsCpp, AddHostStateCallbackRegisters)
 {
-    static int callCount = 0;
-    callCount = 0;
-    addHostStateCallback([&](HostState, HostState) { ++callCount; });
+    addHostStateCallback([](HostState, HostState) {});
     EXPECT_EQ(hostState, HostState::off);
 }
 
@@ -333,11 +331,8 @@ TEST(CpuinfoUtilsCpp, DbusGetIOContextAndConnection)
 
 TEST(CpuinfoUtilsCpp, MultipleCallbacksCanBeRegistered)
 {
-    static int first = 0, second = 0;
-    first = 0;
-    second = 0;
-    addHostStateCallback([&](HostState, HostState) { ++first; });
-    addHostStateCallback([&](HostState, HostState) { ++second; });
+    addHostStateCallback([](HostState, HostState) {});
+    addHostStateCallback([](HostState, HostState) {});
     EXPECT_EQ(hostState, HostState::off);
 }
 

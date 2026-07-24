@@ -64,9 +64,16 @@
 #include <variant>
 #include <vector>
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wkeyword-macro"
+#endif
 #define private public
 #include "mdrv2.hpp"
 #undef private
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -2438,7 +2445,10 @@ TEST_F(Mdrv2Fixture, PrivateGetTotalSmbiosEntriesStopsAtLimit)
     auto total = mdr.getTotalSmbiosEntries(memoryDeviceType);
 
     ASSERT_TRUE(total.has_value());
-    EXPECT_EQ(*total, phosphor::smbios::limitEntryLen);
+    if (total)
+    {
+        EXPECT_EQ(*total, phosphor::smbios::limitEntryLen);
+    }
 }
 
 TEST_F(Mdrv2Fixture, PrivateGetTotalSmbiosEntriesNextPtrNullBreaks)
@@ -2457,7 +2467,10 @@ TEST_F(Mdrv2Fixture, PrivateGetTotalSmbiosEntriesNextPtrNullBreaks)
     auto total = mdr.getTotalSmbiosEntries(memoryDeviceType);
 
     ASSERT_TRUE(total.has_value());
-    EXPECT_EQ(*total, 1u);
+    if (total)
+    {
+        EXPECT_EQ(*total, 1u);
+    }
 }
 
 TEST_F(Mdrv2Fixture, GetRecordTypeThrowsWhenStorageNull)

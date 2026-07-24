@@ -154,7 +154,7 @@ class Baseboard
   private:
     uint8_t* storage;
 
-    int index;
+    [[maybe_unused]] int index;
 
     std::string name;
 

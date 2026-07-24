@@ -342,6 +342,20 @@ class Cpu :
 #endif
 {
   public:
+    // Re‑expose Asset properties
+    using sdbusplus::server::xyz::openbmc_project::inventory::decorator::Asset::
+        manufacturer;
+    using sdbusplus::server::xyz::openbmc_project::inventory::decorator::Asset::
+        partNumber;
+    using sdbusplus::server::xyz::openbmc_project::inventory::decorator::Asset::
+        serialNumber;
+    using sdbusplus::server::xyz::openbmc_project::inventory::decorator::
+        Revision::version;
+    using sdbusplus::server::xyz::openbmc_project::inventory::item::Cpu::
+        characteristics;
+    using sdbusplus::server::xyz::openbmc_project::inventory::item::Cpu::family;
+    using sdbusplus::server::xyz::openbmc_project::inventory::item::Cpu::socket;
+
     Cpu() = delete;
     Cpu(const Cpu&) = delete;
     Cpu& operator=(const Cpu&) = delete;
@@ -497,12 +511,12 @@ class Cpu :
     void socket(const uint8_t positionNum, const uint8_t structLen,
                 uint8_t* dataIn);
     void family(const uint8_t family, const uint16_t family2);
-    void manufacturer(const uint8_t positionNum, const uint8_t structLen,
-                      uint8_t* dataIn);
-    void serialNumber(const uint8_t positionNum, const uint8_t structLen,
-                      uint8_t* dataIn);
-    void partNumber(const uint8_t positionNum, const uint8_t structLen,
-                    uint8_t* dataIn);
+    void populateManufacturer(const uint8_t positionNum,
+                              const uint8_t structLen, uint8_t* dataIn);
+    void populateSerialNumber(const uint8_t positionNum,
+                              const uint8_t structLen, uint8_t* dataIn);
+    void populatePartNumber(const uint8_t positionNum, const uint8_t structLen,
+                            uint8_t* dataIn);
     void version(const uint8_t positionNum, const uint8_t structLen,
                  uint8_t* dataIn);
     void characteristics(const uint16_t value);

@@ -36,24 +36,24 @@ void chassisCpu::locationString(const uint8_t positionNum,
     location::locationCode(std::move(result));
 }
 
-void chassisCpu::manufacturer(const uint8_t positionNum,
-                              const uint8_t structLen, uint8_t* dataIn)
+void chassisCpu::populateManufacturer(const uint8_t positionNum,
+                                      const uint8_t structLen, uint8_t* dataIn)
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
     asset::manufacturer(std::move(result));
 }
 
-void chassisCpu::partNumber(const uint8_t positionNum, const uint8_t structLen,
-                            uint8_t* dataIn)
+void chassisCpu::populatePartNumber(const uint8_t positionNum,
+                                    const uint8_t structLen, uint8_t* dataIn)
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
     asset::partNumber(std::move(result));
 }
 
-void chassisCpu::serialNumber(const uint8_t positionNum,
-                              const uint8_t structLen, uint8_t* dataIn)
+void chassisCpu::populateSerialNumber(const uint8_t positionNum,
+                                      const uint8_t structLen, uint8_t* dataIn)
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
@@ -68,8 +68,8 @@ void chassisCpu::assetTagString(const uint8_t positionNum,
     assetTagType::assetTag(std::move(result));
 }
 
-void chassisCpu::model(const uint8_t positionNum, const uint8_t structLen,
-                       uint8_t* dataIn)
+void chassisCpu::populateModel(const uint8_t positionNum,
+                               const uint8_t structLen, uint8_t* dataIn)
 {
     std::string result;
 
@@ -138,16 +138,16 @@ void chassisCpu::infoUpdate(uint8_t* smbiosTableStorage,
         functional(false);
     }
 
-    manufacturer(cpuInfo->manufacturer, cpuInfo->length,
-                 dataIn);                             // offset 7h
+    populateManufacturer(cpuInfo->manufacturer, cpuInfo->length,
+                         dataIn);                             // offset 7h
 
-    model(cpuInfo->version, cpuInfo->length, dataIn); // offset 10h
-    serialNumber(cpuInfo->serialNum, cpuInfo->length,
-                 dataIn);                             // offset 20h
+    populateModel(cpuInfo->version, cpuInfo->length, dataIn); // offset 10h
+    populateSerialNumber(cpuInfo->serialNum, cpuInfo->length,
+                         dataIn);                             // offset 20h
     assetTagString(cpuInfo->assetTag, cpuInfo->length,
-                   dataIn);                           // offset 21h
-    partNumber(cpuInfo->partNum, cpuInfo->length,
-               dataIn);                               // offset 22h
+                   dataIn);                                   // offset 21h
+    populatePartNumber(cpuInfo->partNum, cpuInfo->length,
+                       dataIn);                               // offset 22h
 
     if (!motherboardPath.empty())
     {

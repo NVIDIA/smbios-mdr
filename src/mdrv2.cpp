@@ -592,10 +592,10 @@ void MDRV2::systemInfoUpdate()
         }
         else
         {
-            motherboardConfigMatch = std::make_unique<sdbusplus::bus::match_t>(
+            motherboardConfigMatch = std::make_unique<sdbusplus::match>(
                 *bus,
-                sdbusplus::bus::match::rules::interfacesAdded() +
-                    sdbusplus::bus::match::rules::argNpath(0, matchParentPath),
+                sdbusplus::match_rules::interfacesAdded() +
+                    sdbusplus::match_rules::argNpath(0, matchParentPath),
                 [this, requireExactMatch](sdbusplus::message_t& msg) {
                     sdbusplus::object_path objectName;
                     boost::container::flat_map<
@@ -809,6 +809,36 @@ void MDRV2::systemInfoUpdate()
             *bus, path, index, smbiosDir.dir[smbiosDirIndex].dataStorage,
             motherboardPath));
     }
+
+#ifdef PCIE_DEVICE_DBUS
+    if (*num < pcieDevices.size())
+    {
+        pcieDevices.resize(*num);
+    }
+
+    for (unsigned int index = 0; index < *num; index++)
+    {
+        std::string devicePath = getObjectPath(
+            smbiosInventoryPath, motherboardPath, pcieDeviceSuffix, index);
+        std::string slotPath = getObjectPath(
+            smbiosInventoryPath, motherboardPath, pcieSuffix, index);
+
+        if (index + 1 > pcieDevices.size())
+        {
+            pcieDevices.emplace_back(
+                std::make_unique<phosphor::smbios::PcieDevice>(
+                    *bus, devicePath, index,
+                    smbiosDir.dir[smbiosDirIndex].dataStorage, motherboardPath,
+                    slotPath));
+        }
+        else
+        {
+            pcieDevices[index]->pcieDeviceInfoUpdate(
+                smbiosDir.dir[smbiosDirIndex].dataStorage, motherboardPath,
+                slotPath);
+        }
+    }
+#endif
 
 #ifdef TPM_DBUS
 

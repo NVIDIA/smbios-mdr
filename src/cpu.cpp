@@ -71,24 +71,24 @@ void Cpu::family(const uint8_t family, const uint16_t family2)
     }
 }
 
-void Cpu::manufacturer(const uint8_t positionNum, const uint8_t structLen,
-                       uint8_t* dataIn)
+void Cpu::populateManufacturer(const uint8_t positionNum,
+                               const uint8_t structLen, uint8_t* dataIn)
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
     asset::manufacturer(std::move(result));
 }
 
-void Cpu::partNumber(const uint8_t positionNum, const uint8_t structLen,
-                     uint8_t* dataIn)
+void Cpu::populatePartNumber(const uint8_t positionNum, const uint8_t structLen,
+                             uint8_t* dataIn)
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
     asset::partNumber(std::move(result));
 }
 
-void Cpu::serialNumber(const uint8_t positionNum, const uint8_t structLen,
-                       uint8_t* dataIn)
+void Cpu::populateSerialNumber(const uint8_t positionNum,
+                               const uint8_t structLen, uint8_t* dataIn)
 {
     std::string result = positionToString(positionNum, structLen, dataIn);
 
@@ -193,8 +193,8 @@ void Cpu::infoUpdate(uint8_t* smbiosTableStorage,
 
     // this class is for type CPU  //offset 5h
     family(cpuInfo->family, cpuInfo->family2); // offset 6h and 28h
-    manufacturer(cpuInfo->manufacturer, cpuInfo->length,
-                 dataIn);                      // offset 7h
+    populateManufacturer(cpuInfo->manufacturer, cpuInfo->length,
+                         dataIn);              // offset 7h
     id(cpuInfo->id);                           // offset 8h
 
     // Step, EffectiveFamily, EffectiveModel computation for Intel processors.
@@ -243,12 +243,12 @@ void Cpu::infoUpdate(uint8_t* smbiosTableStorage,
 
     version(cpuInfo->version, cpuInfo->length, dataIn); // offset 10h
     maxSpeedInMhz(cpuInfo->maxSpeed);                   // offset 14h
-    serialNumber(cpuInfo->serialNum, cpuInfo->length,
-                 dataIn);                               // offset 20h
+    populateSerialNumber(cpuInfo->serialNum, cpuInfo->length,
+                         dataIn);                       // offset 20h
     assetTagString(cpuInfo->assetTag, cpuInfo->length,
                    dataIn);                             // offset 21h
-    partNumber(cpuInfo->partNum, cpuInfo->length,
-               dataIn);                                 // offset 22h
+    populatePartNumber(cpuInfo->partNum, cpuInfo->length,
+                       dataIn);                         // offset 22h
     if (cpuInfo->coreCount < maxOldVersionCount)        // offset 23h or 2Ah
     {
         coreCount(cpuInfo->coreCount);

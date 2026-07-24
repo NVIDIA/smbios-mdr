@@ -4,6 +4,15 @@ if get_option('publish-inventory').allowed()
     cpp_args_smbios += ['-DPUBLISH_INVENTORY']
 endif
 
+if get_option('pcie-device-dbus').allowed()
+    cpp_args_smbios += ['-DPCIE_DEVICE_DBUS']
+endif
+
+pcie_device_src = []
+if get_option('pcie-device-dbus').allowed()
+    pcie_device_src = ['pciedevice.cpp']
+endif
+
 executable(
     'smbiosmdrv2app',
     'mdrv2.cpp',
@@ -16,6 +25,7 @@ executable(
     'firmware_inventory.cpp',
     'chassisCpu.cpp',
     'nvidia_firmware_inventory.cpp',
+    pcie_device_src,
     cpp_args: cpp_args_smbios,
     dependencies: [
         boost_dep,
