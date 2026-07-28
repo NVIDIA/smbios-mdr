@@ -190,7 +190,7 @@ static constexpr const char* pcieSuffix = "/chassis/motherboard/pcieslot";
 
 static constexpr const char* systemSuffix = "/chassis/motherboard/bios";
 
-static constexpr const char* tpmSuffix = "/chassis/motherboard/tpm";
+static constexpr const char* tpmSuffix = "/chassis/motherboard/TPM_";
 
 static constexpr const char* firmwarePath = "/xyz/openbmc_project/software";
 
