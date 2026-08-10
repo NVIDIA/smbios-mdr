@@ -66,13 +66,13 @@ class SmbiosBlobHandler : public GenericBlobInterface
     bool stat(uint16_t session, struct BlobMeta* meta) override;
     bool expire(uint16_t session) override;
 
-    /* Override the destination file for committed SMBIOS data. Only intended
-     * for unit testing; production code uses the mdrDefaultFile default.
-     */
+#ifdef SMBIOS_BLOB_UNIT_TEST
+    /* Override the persisted SMBIOS table path; unit tests only. */
     void setSmbiosFilePath(const std::string& path)
     {
         smbiosFilePath = path;
     }
+#endif
 
   protected:
     virtual bool syncSmbiosData();
@@ -86,7 +86,7 @@ class SmbiosBlobHandler : public GenericBlobInterface
     /* The handler only allows one open blob. */
     std::unique_ptr<SmbiosBlob> blobPtr = nullptr;
 
-    /* Destination file for committed SMBIOS data. */
+    /* Persisted SMBIOS table: commit destination, reported by path stat. */
     std::string smbiosFilePath = mdrDefaultFile;
 };
 
