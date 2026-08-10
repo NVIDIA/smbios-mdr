@@ -1,5 +1,7 @@
 #pragma once
 
+#include "smbios_mdrv2.hpp"
+
 #include <blobs-ipmid/blobs.hpp>
 
 #include <cstdint>
@@ -64,6 +66,14 @@ class SmbiosBlobHandler : public GenericBlobInterface
     bool stat(uint16_t session, struct BlobMeta* meta) override;
     bool expire(uint16_t session) override;
 
+#ifdef SMBIOS_BLOB_UNIT_TEST
+    /* Override the persisted SMBIOS table path; unit tests only. */
+    void setSmbiosFilePath(const std::string& path)
+    {
+        smbiosFilePath = path;
+    }
+#endif
+
   private:
     static constexpr char blobId[] = "/smbios";
 
@@ -72,6 +82,9 @@ class SmbiosBlobHandler : public GenericBlobInterface
 
     /* The handler only allows one open blob. */
     std::unique_ptr<SmbiosBlob> blobPtr = nullptr;
+
+    /* Persisted SMBIOS table reported by path stat. */
+    std::string smbiosFilePath = mdrDefaultFile;
 };
 
 } // namespace blobs

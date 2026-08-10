@@ -15,6 +15,7 @@ foreach t : tests
             t.underscorify(),
             t + '.cpp',
             '../handler.cpp',
+            cpp_args: '-DSMBIOS_BLOB_UNIT_TEST',
             include_directories: ['../', root_inc],
             dependencies: [
                 smbiosstore_common_deps,
