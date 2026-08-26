@@ -35,15 +35,15 @@ class FirmwareInventory :
     ~FirmwareInventory() = default;
     FirmwareInventory(const FirmwareInventory&) = delete;
     FirmwareInventory& operator=(const FirmwareInventory&) = delete;
-    FirmwareInventory(FirmwareInventory&&) = delete;
-    FirmwareInventory& operator=(FirmwareInventory&&) = delete;
+    FirmwareInventory(FirmwareInventory&&) = default;
+    FirmwareInventory& operator=(FirmwareInventory&&) = default;
 
     FirmwareInventory(sdbusplus::bus_t& bus, const std::string& objPath,
                       const uint8_t index, uint8_t* smbiosTableStorage) :
         sdbusplus::server::object_t<softwareAsset, item, softwareVersion,
                                     softwareExtendedVersion>(bus,
                                                              objPath.c_str()),
-        firmwareInventoryIndex(index)
+        firmwareInventoryIndex(index), storage(smbiosTableStorage)
     {
         firmwareInfoUpdate(smbiosTableStorage);
     }
@@ -56,6 +56,8 @@ class FirmwareInventory :
 
   private:
     int firmwareInventoryIndex;
+
+    uint8_t* storage;
 
     struct FirmwareInfo
     {
