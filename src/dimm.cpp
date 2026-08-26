@@ -57,7 +57,8 @@ void Dimm::memoryInfoUpdate(uint8_t* smbiosTableStorage,
 
     uint8_t* dataIn = storage;
 
-    dataIn = getSMBIOSTypePtr(dataIn, memoryDeviceType);
+    dataIn = getSMBIOSTypePtr(dataIn, memoryDeviceType, sizeof(MemoryInfo),
+                              storage + smbiosTableStorageSize);
 
     if (dataIn == nullptr)
     {
@@ -65,12 +66,13 @@ void Dimm::memoryInfoUpdate(uint8_t* smbiosTableStorage,
     }
     for (uint8_t index = 0; index < dimmNum; index++)
     {
-        dataIn = smbiosNextPtr(dataIn);
+        dataIn = smbiosNextPtr(dataIn, storage + smbiosTableStorageSize);
         if (dataIn == nullptr)
         {
             return;
         }
-        dataIn = getSMBIOSTypePtr(dataIn, memoryDeviceType);
+        dataIn = getSMBIOSTypePtr(dataIn, memoryDeviceType, sizeof(MemoryInfo),
+                                  storage + smbiosTableStorageSize);
         if (dataIn == nullptr)
         {
             return;
@@ -147,7 +149,9 @@ void Dimm::updateEccType(uint16_t exPhyArrayHandle)
 
     while (dataIn != nullptr)
     {
-        dataIn = getSMBIOSTypePtr(dataIn, physicalMemoryArrayType);
+        dataIn = getSMBIOSTypePtr(dataIn, physicalMemoryArrayType,
+                                  sizeof(PhysicalMemoryArrayInfo),
+                                  storage + smbiosTableStorageSize);
         if (dataIn == nullptr)
         {
             lg2::error("Failed to get SMBIOS table type-16 data.");
@@ -170,7 +174,7 @@ void Dimm::updateEccType(uint16_t exPhyArrayHandle)
             return;
         }
 
-        dataIn = smbiosNextPtr(dataIn);
+        dataIn = smbiosNextPtr(dataIn, storage + smbiosTableStorageSize);
     }
     lg2::error(
         "Failed find the corresponding SMBIOS table type-16 data for dimm: {DIMM}",
@@ -224,9 +228,11 @@ void Dimm::dimmDeviceLocator(const uint8_t bankLocatorPositionNum,
                              const uint8_t structLen, uint8_t* dataIn)
 {
     std::string deviceLocator =
-        positionToString(deviceLocatorPositionNum, structLen, dataIn);
+        positionToString(deviceLocatorPositionNum, structLen, dataIn,
+                         storage + smbiosTableStorageSize);
     std::string bankLocator =
-        positionToString(bankLocatorPositionNum, structLen, dataIn);
+        positionToString(bankLocatorPositionNum, structLen, dataIn,
+                         storage + smbiosTableStorageSize);
 
     std::string result;
     if (bankLocator.empty() || onlyDimmLocationCode)
@@ -288,7 +294,7 @@ void Dimm::dimmDeviceLocator(const uint8_t bankLocatorPositionNum,
                     static_cast<uint8_t>(std::stoi(socketString) + 1);
                 socket(socketNum);
             }
-            catch (const sdbusplus::exception_t& ex)
+            catch (const std::exception& ex)
             {
                 lg2::error("std::stoi operation failed {ERROR}", "ERROR",
                            ex.what());
@@ -388,7 +394,8 @@ uint16_t Dimm::maxMemorySpeedInMhz(uint16_t value)
 void Dimm::dimmManufacturer(const uint8_t positionNum, const uint8_t structLen,
                             uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
 
     if (result == "NO DIMM")
     {
@@ -415,7 +422,8 @@ bool Dimm::present(bool value)
 void Dimm::dimmSerialNum(const uint8_t positionNum, const uint8_t structLen,
                          uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
 
     serialNumber(std::move(result));
 }
@@ -429,7 +437,8 @@ std::string Dimm::serialNumber(std::string value)
 void Dimm::dimmPartNum(const uint8_t positionNum, const uint8_t structLen,
                        uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
 
     // Part number could contain spaces at the end. Eg: "abcd123  ". Since its
     // unnecessary, we should remove them.

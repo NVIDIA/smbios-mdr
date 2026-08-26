@@ -18,9 +18,9 @@
 #include "config.h"
 
 #include <phosphor-logging/elog-errors.hpp>
-#include <phosphor-logging/lg2.hpp>
 
 #include <array>
+#include <cstring>
 #include <filesystem>
 #include <string>
 
@@ -231,17 +231,22 @@ typedef enum
 
 static constexpr uint8_t separateLen = 2;
 
-static inline uint8_t* smbiosSkipEntryPoint(uint8_t* smbiosDataIn);
-
-static inline uint8_t* smbiosNextPtr(uint8_t* smbiosDataIn)
+static inline uint8_t* smbiosNextPtr(uint8_t* smbiosDataIn,
+                                     const uint8_t* dataEnd = nullptr)
 {
     if (smbiosDataIn == nullptr)
     {
         return nullptr;
     }
+    // Bound dereferences by the real buffer end when dataEnd is supplied.
+    if (dataEnd != nullptr && smbiosDataIn + 1 >= dataEnd)
+    {
+        return nullptr;
+    }
     uint8_t* smbiosData = smbiosDataIn + *(smbiosDataIn + 1);
     int len = 0;
-    while ((*smbiosData | *(smbiosData + 1)) != 0)
+    while ((dataEnd == nullptr || smbiosData + 1 < dataEnd) &&
+           (*smbiosData | *(smbiosData + 1)) != 0)
     {
         smbiosData++;
         len++;
@@ -250,15 +255,27 @@ static inline uint8_t* smbiosNextPtr(uint8_t* smbiosDataIn)
             return nullptr;
         }
     }
+    if (dataEnd != nullptr && smbiosData + separateLen > dataEnd)
+    {
+        return nullptr;
+    }
     return smbiosData + separateLen;
 }
 
-static inline uint8_t* smbiosSkipEntryPoint(uint8_t* smbiosDataIn)
+static inline uint8_t* smbiosSkipEntryPoint(uint8_t* smbiosDataIn,
+                                            const uint8_t* dataEnd = nullptr)
 {
     const std::string anchorString30 = "_SM3_";
     if (smbiosDataIn == nullptr)
     {
         return nullptr;
+    }
+
+    // Verify the buffer holds a full EntryPointStructure30 before the cast.
+    if (dataEnd != nullptr &&
+        smbiosDataIn + sizeof(EntryPointStructure30) > dataEnd)
+    {
+        return smbiosDataIn;
     }
 
     // Jump to starting address of the SMBIOS Structure Table from Entry Point
@@ -268,7 +285,9 @@ static inline uint8_t* smbiosSkipEntryPoint(uint8_t* smbiosDataIn)
     {
         auto epStructure =
             reinterpret_cast<const EntryPointStructure30*>(smbiosDataIn);
-        if (epStructure->structTableAddr < mdrSMBIOSSize)
+        if (epStructure->structTableAddr < mdrSMBIOSSize &&
+            (dataEnd == nullptr ||
+             smbiosDataIn + epStructure->structTableAddr < dataEnd))
         {
             smbiosDataIn += epStructure->structTableAddr;
         }
@@ -277,56 +296,70 @@ static inline uint8_t* smbiosSkipEntryPoint(uint8_t* smbiosDataIn)
     return smbiosDataIn;
 }
 
-// smbiosDataIn may point to the raw SMBIOS MDR region data or to an
-// already-advanced SMBIOS structure. Skip an SMBIOS entry point when present
-// before scanning for the requested type.
+// When first time run getSMBIOSTypePtr, need to send the RegionS[].regionData
+// to smbiosDataIn
 static inline uint8_t* getSMBIOSTypePtr(uint8_t* smbiosDataIn, uint8_t typeId,
-                                        size_t size = 0)
+                                        size_t size = 0,
+                                        const uint8_t* dataEnd = nullptr)
 {
     if (smbiosDataIn == nullptr)
     {
         return nullptr;
     }
-    uint8_t* smbiosData = smbiosSkipEntryPoint(smbiosDataIn);
+    smbiosDataIn = smbiosSkipEntryPoint(smbiosDataIn, dataEnd);
+    char* smbiosData = reinterpret_cast<char*>(smbiosDataIn);
 
-    while ((*smbiosData != '\0') || (*(smbiosData + 1) != '\0'))
+    while ((dataEnd == nullptr ||
+            reinterpret_cast<const uint8_t*>(smbiosData) + 1 < dataEnd) &&
+           ((*smbiosData != '\0') || (*(smbiosData + 1) != '\0')))
     {
         uint32_t len = *(smbiosData + 1);
         if (*smbiosData != typeId)
         {
-            smbiosData = smbiosNextPtr(smbiosData);
-            if (smbiosData == nullptr)
+            smbiosData += len;
+            while ((*smbiosData != '\0') || (*(smbiosData + 1) != '\0'))
             {
-                return nullptr;
+                smbiosData++;
+                len++;
+                if (len >= mdrSMBIOSSize) // To avoid endless loop
+                {
+                    return nullptr;
+                }
+                if (dataEnd != nullptr &&
+                    reinterpret_cast<const uint8_t*>(smbiosData) + 1 >= dataEnd)
+                {
+                    return nullptr;
+                }
             }
+            smbiosData += separateLen;
             continue;
         }
+        // Reject too-short records to prevent fixed-offset OOB reads.
         if (len < size)
         {
-            // Skip undersized entry, same as type-mismatch path above
-            lg2::warning(
-                "SMBIOS type {TYPE} entry too short ({LEN} < {MIN}), skipping",
-                "TYPE", static_cast<uint8_t>(*smbiosData), "LEN", len, "MIN",
-                size);
-            smbiosData = smbiosNextPtr(smbiosData);
-            if (smbiosData == nullptr)
-            {
-                return nullptr;
-            }
-            continue;
+            phosphor::logging::log<phosphor::logging::level::ERR>(
+                "Record size mismatch!");
+            return nullptr;
         }
-        return smbiosData;
+        // Ensure the located structure's declared fields fit inside the buffer.
+        if (dataEnd != nullptr &&
+            reinterpret_cast<const uint8_t*>(smbiosData) + size > dataEnd)
+        {
+            return nullptr;
+        }
+        return reinterpret_cast<uint8_t*>(smbiosData);
     }
     return nullptr;
 }
 
 // Get the nth occurrence of a specific SMBIOS type
 static inline uint8_t* getSMBIOSTypeIndexPtr(
-    uint8_t* smbiosDataIn, uint8_t typeId, uint8_t targetIndex = 0)
+    uint8_t* smbiosDataIn, uint8_t typeId, uint8_t targetIndex = 0,
+    size_t size = 0, const uint8_t* dataEnd = nullptr)
 {
     uint8_t* dataIn = smbiosDataIn;
 
-    dataIn = getSMBIOSTypePtr(dataIn, typeId);
+    dataIn = getSMBIOSTypePtr(dataIn, typeId, size, dataEnd);
     if (dataIn == nullptr)
     {
         return nullptr;
@@ -334,12 +367,12 @@ static inline uint8_t* getSMBIOSTypeIndexPtr(
 
     for (uint8_t index = 0; index < targetIndex; index++)
     {
-        dataIn = smbiosNextPtr(dataIn);
+        dataIn = smbiosNextPtr(dataIn, dataEnd);
         if (dataIn == nullptr)
         {
             return nullptr;
         }
-        dataIn = getSMBIOSTypePtr(dataIn, typeId);
+        dataIn = getSMBIOSTypePtr(dataIn, typeId, size, dataEnd);
         if (dataIn == nullptr)
         {
             return nullptr;
@@ -349,12 +382,17 @@ static inline uint8_t* getSMBIOSTypeIndexPtr(
     return dataIn;
 }
 
-static inline uint8_t* smbiosHandlePtr(uint8_t* smbiosDataIn, uint16_t handle)
+static inline uint8_t* smbiosHandlePtr(uint8_t* smbiosDataIn, uint16_t handle,
+                                       const uint8_t* dataEnd = nullptr)
 {
-    auto ptr = smbiosSkipEntryPoint(smbiosDataIn);
+    auto ptr = smbiosSkipEntryPoint(smbiosDataIn, dataEnd);
     struct StructureHeader* header;
     while (ptr != nullptr)
     {
+        if (dataEnd != nullptr && ptr + sizeof(StructureHeader) > dataEnd)
+        {
+            return nullptr;
+        }
         header = reinterpret_cast<struct StructureHeader*>(ptr);
         if (header->length < sizeof(StructureHeader))
         {
@@ -365,13 +403,14 @@ static inline uint8_t* smbiosHandlePtr(uint8_t* smbiosDataIn, uint16_t handle)
         {
             return ptr;
         }
-        ptr = smbiosNextPtr(ptr);
+        ptr = smbiosNextPtr(ptr, dataEnd);
     }
     return nullptr;
 }
 
 static inline std::string positionToString(uint8_t positionNum,
-                                           uint8_t structLen, uint8_t* dataIn)
+                                           uint8_t structLen, uint8_t* dataIn,
+                                           const uint8_t* dataEnd = nullptr)
 {
     constexpr uint8_t maxSmbiosStringIndex = 64;
     if (dataIn == nullptr || positionNum == 0 ||
@@ -382,9 +421,17 @@ static inline std::string positionToString(uint8_t positionNum,
     uint16_t limit = mdrSMBIOSSize; // set a limit to avoid endless loop
 
     char* target = reinterpret_cast<char*>(dataIn + structLen);
+    if (dataEnd != nullptr &&
+        reinterpret_cast<const uint8_t*>(target) >= dataEnd)
+    {
+        return "";
+    }
     for (uint8_t index = 1; index < positionNum; index++)
     {
-        for (; *target != '\0'; target++)
+        for (; (dataEnd == nullptr ||
+                reinterpret_cast<const uint8_t*>(target) < dataEnd) &&
+               *target != '\0';
+             target++)
         {
             limit--;
             if (limit < 1)
@@ -392,11 +439,32 @@ static inline std::string positionToString(uint8_t positionNum,
                 return "";
             }
         }
+        if (dataEnd != nullptr &&
+            reinterpret_cast<const uint8_t*>(target) >= dataEnd)
+        {
+            return "";
+        }
         target++;
-        if (*target == '\0')
+        if ((dataEnd != nullptr &&
+             reinterpret_cast<const uint8_t*>(target) >= dataEnd) ||
+            *target == '\0')
         {
             return ""; // 0x00 0x00 means end of the entry.
         }
+    }
+
+    // Bound the final string copy by the buffer end instead of strlen.
+    if (dataEnd != nullptr)
+    {
+        const void* strEnd =
+            memchr(target, '\0',
+                   static_cast<size_t>(
+                       dataEnd - reinterpret_cast<const uint8_t*>(target)));
+        if (strEnd == nullptr)
+        {
+            return "";
+        }
+        return std::string(target, static_cast<const char*>(strEnd) - target);
     }
 
     size_t outLen = 0;

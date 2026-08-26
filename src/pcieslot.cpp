@@ -14,7 +14,9 @@ void Pcie::pcieInfoUpdate(uint8_t* smbiosTableStorage,
     storage = smbiosTableStorage;
     motherboardPath = motherboard;
 
-    uint8_t* dataIn = getSMBIOSTypePtr(storage, systemSlots);
+    uint8_t* dataIn =
+        getSMBIOSTypePtr(storage, systemSlots, sizeof(SystemSlotInfo),
+                         storage + smbiosTableStorageSize);
 
     if (dataIn == nullptr)
     {
@@ -26,12 +28,13 @@ void Pcie::pcieInfoUpdate(uint8_t* smbiosTableStorage,
          index < pcieNum ||
          pcieSmbiosType.find(*(dataIn + 5)) == pcieSmbiosType.end();)
     {
-        dataIn = smbiosNextPtr(dataIn);
+        dataIn = smbiosNextPtr(dataIn, storage + smbiosTableStorageSize);
         if (dataIn == nullptr)
         {
             return;
         }
-        dataIn = getSMBIOSTypePtr(dataIn, systemSlots);
+        dataIn = getSMBIOSTypePtr(dataIn, systemSlots, sizeof(SystemSlotInfo),
+                                  storage + smbiosTableStorageSize);
         if (dataIn == nullptr)
         {
             return;
@@ -129,8 +132,8 @@ void Pcie::pcieIsHotPluggable(const uint8_t characteristics)
 void Pcie::pcieLocation(const uint8_t slotDesignation, const uint8_t structLen,
                         uint8_t* dataIn)
 {
-    location::locationCode(
-        positionToString(slotDesignation, structLen, dataIn));
+    location::locationCode(positionToString(slotDesignation, structLen, dataIn,
+                                            storage + smbiosTableStorageSize));
 }
 
 } // namespace smbios

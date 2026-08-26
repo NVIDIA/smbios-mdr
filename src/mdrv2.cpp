@@ -387,6 +387,13 @@ bool MDRV2::sendDirectoryInformation(
         throw sdbusplus::xyz::openbmc_project::Smbios::MDR_V2::Error::
             InvalidParameter();
     }
+    // Reject writes that would overrun the fixed dir[] array (OOB write).
+    if (static_cast<size_t>(dirIndex) + returnedEntries > maxDirEntries)
+    {
+        lg2::error("Send Dir info failed - entries exceed directory capacity");
+        throw sdbusplus::xyz::openbmc_project::Smbios::MDR_V2::Error::
+            InvalidParameter();
+    }
     if ((static_cast<size_t>(returnedEntries) * sizeof(DataIdStruct)) !=
         dirEntry.size())
     {
@@ -747,9 +754,12 @@ void MDRV2::systemInfoUpdate()
 
         // customize path if we know the socket number
         auto dataPtr = getSMBIOSTypeIndexPtr(
-            smbiosDir.dir[smbiosDirIndex].dataStorage, processorsType, index);
-        auto [found, socket, chip] = Cpu::socketChipNumber(dataPtr);
-        if (found)
+            smbiosDir.dir[smbiosDirIndex].dataStorage, processorsType, index, 0,
+            smbiosDir.dir[smbiosDirIndex].dataStorage + smbiosTableStorageSize);
+        auto [found, socket, chip] = Cpu::socketChipNumber(
+            dataPtr,
+            smbiosDir.dir[smbiosDirIndex].dataStorage + smbiosTableStorageSize);
+        if (found && modules.size())
         {
             const ProcessorModule* module =
                 findProcessorModuleForCpu(modules, socket);
@@ -781,7 +791,13 @@ void MDRV2::systemInfoUpdate()
     {
         // Rename the object if it's contaned by a board
         uint8_t* dataIn = smbiosDir.dir[smbiosDirIndex].dataStorage;
-        dataIn = getSMBIOSTypeIndexPtr(dataIn, memoryDeviceType, index);
+        dataIn = getSMBIOSTypeIndexPtr(dataIn, memoryDeviceType, index,
+                                       sizeof(struct StructureHeader),
+                                       dataIn + smbiosTableStorageSize);
+        if (dataIn == nullptr)
+        {
+            continue;
+        }
         auto memoryHeader = reinterpret_cast<struct StructureHeader*>(dataIn);
         std::string objName =
             memoryObjectName(baseboards, memoryHeader->handle, index);
@@ -923,9 +939,11 @@ std::optional<size_t> MDRV2::getTotalSmbiosEntries(uint8_t smbiosType)
         return std::nullopt;
     }
 
+    const uint8_t* dataEnd = dataIn + smbiosTableStorageSize;
+
     while (1)
     {
-        dataIn = getSMBIOSTypePtr(dataIn, smbiosType);
+        dataIn = getSMBIOSTypePtr(dataIn, smbiosType, 0, dataEnd);
         if (dataIn == nullptr)
         {
             break;
@@ -934,6 +952,10 @@ std::optional<size_t> MDRV2::getTotalSmbiosEntries(uint8_t smbiosType)
         // Special handling for PCIe slots
         if (smbiosType == systemSlots)
         {
+            if (dataIn + 5 >= dataEnd)
+            {
+                break;
+            }
             if (pcieSmbiosType.find(*(dataIn + 5)) != pcieSmbiosType.end())
             {
                 num++;
@@ -947,7 +969,7 @@ std::optional<size_t> MDRV2::getTotalSmbiosEntries(uint8_t smbiosType)
         {
             break;
         }
-        dataIn = smbiosNextPtr(dataIn);
+        dataIn = smbiosNextPtr(dataIn, dataEnd);
         if (dataIn == nullptr)
         {
             break;
@@ -1043,6 +1065,13 @@ bool MDRV2::agentSynchronizeData()
         return false;
     }
 
+    // Reject a declared data extent larger than the backing storage.
+    if (mdr2SMBIOS.dataSize > smbiosTableStorageSize)
+    {
+        lg2::error("SMBIOS data size exceeds storage capacity");
+        return false;
+    }
+
     if (0 == static_cast<uint8_t>(sdbusplus::server::xyz::openbmc_project::
                                       smbios::MDRV2::directoryEntries()))
     {
@@ -1107,10 +1136,13 @@ std::vector<boost::container::flat_map<std::string, RecordVariant>>
             throw std::runtime_error("Data not populated");
         }
 
+        // Real end of the fixed backing buffer; bounds the reads below.
+        const uint8_t* dataEnd = dataIn + smbiosTableStorageSize;
+
         do
         {
-            dataIn =
-                getSMBIOSTypePtr(dataIn, memoryDeviceType, sizeof(MemoryInfo));
+            dataIn = getSMBIOSTypePtr(dataIn, memoryDeviceType,
+                                      sizeof(MemoryInfo), dataEnd);
             if (dataIn == nullptr)
             {
                 break;
@@ -1133,20 +1165,20 @@ std::vector<boost::container::flat_map<std::string, RecordVariant>>
             record["Form Factor"] = memoryInfo->formFactor;
             record["Device Set"] = memoryInfo->deviceSet;
             record["Device Locator"] = positionToString(
-                memoryInfo->deviceLocator, memoryInfo->length, dataIn);
+                memoryInfo->deviceLocator, memoryInfo->length, dataIn, dataEnd);
             record["Bank Locator"] = positionToString(
-                memoryInfo->bankLocator, memoryInfo->length, dataIn);
+                memoryInfo->bankLocator, memoryInfo->length, dataIn, dataEnd);
             record["Memory Type"] = memoryInfo->memoryType;
             record["Type Detail"] = uint16_t(memoryInfo->typeDetail);
             record["Speed"] = uint16_t(memoryInfo->speed);
             record["Manufacturer"] = positionToString(
-                memoryInfo->manufacturer, memoryInfo->length, dataIn);
+                memoryInfo->manufacturer, memoryInfo->length, dataIn, dataEnd);
             record["Serial Number"] = positionToString(
-                memoryInfo->serialNum, memoryInfo->length, dataIn);
-            record["Asset Tag"] = positionToString(memoryInfo->assetTag,
-                                                   memoryInfo->length, dataIn);
+                memoryInfo->serialNum, memoryInfo->length, dataIn, dataEnd);
+            record["Asset Tag"] = positionToString(
+                memoryInfo->assetTag, memoryInfo->length, dataIn, dataEnd);
             record["Part Number"] = positionToString(
-                memoryInfo->partNum, memoryInfo->length, dataIn);
+                memoryInfo->partNum, memoryInfo->length, dataIn, dataEnd);
             record["Attributes"] = uint32_t(memoryInfo->attributes);
             record["Extended Size"] = uint32_t(memoryInfo->extendedSize);
             record["Configured Memory Speed"] =
@@ -1170,7 +1202,7 @@ std::vector<boost::container::flat_map<std::string, RecordVariant>>
             record["Volatile Size"] = uint64_t(memoryInfo->volatileSize);
             record["Cache Size"] = uint64_t(memoryInfo->cacheSize);
             record["Logical Size"] = uint64_t(memoryInfo->logicalSize);
-        } while ((dataIn = smbiosNextPtr(dataIn)) != nullptr);
+        } while ((dataIn = smbiosNextPtr(dataIn, dataEnd)) != nullptr);
 
         return ret;
     }

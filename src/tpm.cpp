@@ -18,6 +18,7 @@
 
 #include "mdrv2.hpp"
 
+#include <cstddef>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -34,19 +35,22 @@ void Tpm::tpmInfoUpdate(uint8_t* smbiosTableStorage,
     motherboardPath = motherboard;
 
     uint8_t* dataIn = storage;
-    dataIn = getSMBIOSTypePtr(dataIn, tpmDeviceType);
+    // Require only the fixed fields we read; trailing OEM bytes are optional.
+    dataIn = getSMBIOSTypePtr(dataIn, tpmDeviceType, offsetof(TPMInfo, oem),
+                              storage + smbiosTableStorageSize);
     if (dataIn == nullptr)
     {
         return;
     }
     for (uint8_t index = 0; index < tpmId; index++)
     {
-        dataIn = smbiosNextPtr(dataIn);
+        dataIn = smbiosNextPtr(dataIn, storage + smbiosTableStorageSize);
         if (dataIn == nullptr)
         {
             return;
         }
-        dataIn = getSMBIOSTypePtr(dataIn, tpmDeviceType);
+        dataIn = getSMBIOSTypePtr(dataIn, tpmDeviceType, offsetof(TPMInfo, oem),
+                                  storage + smbiosTableStorageSize);
         if (dataIn == nullptr)
         {
             return;
@@ -105,7 +109,8 @@ void Tpm::tpmFirmwareVersion(const struct TPMInfo* tpmInfo)
 void Tpm::tpmDescription(const uint8_t positionNum, const uint8_t structLen,
                          uint8_t* dataIn)
 {
-    std::string result = positionToString(positionNum, structLen, dataIn);
+    std::string result = positionToString(positionNum, structLen, dataIn,
+                                          storage + smbiosTableStorageSize);
     prettyName(result);
 }
 } // namespace smbios

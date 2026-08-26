@@ -87,7 +87,8 @@ class FirmwareInventory :
                               const uint8_t structLen, uint8_t* dataIn);
     void firmwareComponentName(const uint8_t positionNum,
                                const uint8_t structLen, uint8_t* dataIn);
-    static bool getFirmwareInventoryData(uint8_t*& dataIn, int inventoryIndex);
+    static bool getFirmwareInventoryData(uint8_t*& dataIn, int inventoryIndex,
+                                         const uint8_t* dataEnd = nullptr);
 };
 } // namespace smbios
 } // namespace phosphor
