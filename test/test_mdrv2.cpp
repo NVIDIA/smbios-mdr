@@ -240,6 +240,38 @@ TEST_F(Mdrv2Fixture, ConstructorWithMissingFileRunsMdrv2CodePaths)
     });
 }
 
+TEST_F(Mdrv2Fixture, InventoryAnchorRetryTerminalStatesAreQuiescent)
+{
+    auto objServer = std::make_shared<sdbusplus::asio::object_server>(conn);
+    phosphor::smbios::MDRV2 mdr(io, conn, objServer, "/nonexistent/smbios2",
+                                phosphor::smbios::defaultObjectPath,
+                                phosphor::smbios::defaultInventoryPath);
+
+    mdr.inventoryAnchorRetryPending = true;
+    mdr.scheduleInventoryAnchorRetry();
+    EXPECT_TRUE(mdr.inventoryAnchorRetryPending);
+
+    mdr.inventoryAnchorRetryPending = false;
+    mdr.inventoryAnchorRetryExhausted = true;
+    mdr.scheduleInventoryAnchorRetry();
+    EXPECT_FALSE(mdr.inventoryAnchorRetryPending);
+
+    mdr.inventoryAnchorRetryExhausted = false;
+    mdr.inventoryAnchorRetryCount =
+        phosphor::smbios::MDRV2::inventoryAnchorRetryLimit;
+    mdr.scheduleInventoryAnchorRetry();
+    EXPECT_TRUE(mdr.inventoryAnchorRetryExhausted);
+    EXPECT_FALSE(mdr.inventoryAnchorRetryPending);
+
+    mdr.inventoryAnchorRetryPending = true;
+    mdr.onInventoryAnchorRetry(boost::asio::error::operation_aborted);
+    EXPECT_FALSE(mdr.inventoryAnchorRetryPending);
+
+    mdr.inventoryAnchorRetryPending = true;
+    mdr.onInventoryAnchorRetry(boost::asio::error::fault);
+    EXPECT_FALSE(mdr.inventoryAnchorRetryPending);
+}
+
 TEST_F(Mdrv2Fixture, ConstructorWithCustomObjectPathRunsPlaceGetRecordTypePath)
 {
     auto objServer = std::make_shared<sdbusplus::asio::object_server>(conn);
@@ -1620,6 +1652,8 @@ TEST(SmbiosHelpers, DecorateNameReturnsUnmodified)
 // ---------------------------------------------------------------------------
 namespace
 {
+constexpr auto inventoryAnchorRetryTestSlack = std::chrono::milliseconds{250};
+
 using GetSubTreeType = std::vector<
     std::pair<std::string,
               std::vector<std::pair<std::string, std::vector<std::string>>>>>;
@@ -1663,6 +1697,12 @@ class FakeObjectMapper
         auto emittedPromise = std::make_shared<std::promise<void>>();
         auto emittedFuture = emittedPromise->get_future();
         boost::asio::post(*io, [this, path, iface, emittedPromise]() {
+            if ((iface == phosphor::smbios::systemInterface ||
+                 iface == phosphor::smbios::boardInterface) &&
+                std::ranges::find(paths, path) == paths.end())
+            {
+                paths.push_back(path);
+            }
             auto i = server->add_interface(path, iface);
             i->initialize(); // emits org.freedesktop.DBus.ObjectManager signal
             emitted.push_back(i);
@@ -1690,13 +1730,10 @@ class FakeObjectMapper
                                       "xyz.openbmc_project.ObjectMapper");
             interfaces.push_back(iface);
 
-            auto localPaths = paths;
             iface->register_method(
                 "GetSubTreePaths",
-                [localPaths](const std::string&, int32_t,
-                             const std::vector<std::string>&) {
-                    return localPaths;
-                });
+                [this](const std::string&, int32_t,
+                       const std::vector<std::string>&) { return paths; });
 
             auto localTree = procModules;
             iface->register_method(
@@ -1808,6 +1845,8 @@ TEST_F(Mdrv2Fixture, InventoryInterfacesAddedSignalUpdatesInventory)
         });
     io->restart();
     io->run();
+    EXPECT_FALSE(mdr.inventoryAnchorRetryPending);
+    EXPECT_EQ(mdr.inventoryAnchorRetryCount, 0u);
     std::remove(path.c_str());
 }
 
@@ -1845,6 +1884,8 @@ TEST_F(Mdrv2Fixture, MotherboardConfigInterfacesAddedSignalUpdatesInventory)
         });
     io->restart();
     io->run();
+    EXPECT_FALSE(mdr.inventoryAnchorRetryPending);
+    EXPECT_EQ(mdr.inventoryAnchorRetryCount, 0u);
     std::remove(path.c_str());
 }
 
@@ -1893,6 +1934,14 @@ TEST(Mdrv2SignalPredicates, MotherboardConfigMatchesSystemAndExactBoard)
                     phosphor::smbios::MDRV2::MotherboardConfigProperties{});
     EXPECT_TRUE(
         phosphor::smbios::MDRV2::motherboardConfigMatches(msgData, false));
+
+    EXPECT_FALSE(phosphor::smbios::MDRV2::motherboardConfigMatches(
+        msgData, false, true));
+    msgData.clear();
+    msgData.emplace(phosphor::smbios::chassisInterface,
+                    phosphor::smbios::MDRV2::MotherboardConfigProperties{});
+    EXPECT_TRUE(phosphor::smbios::MDRV2::motherboardConfigMatches(
+        msgData, false, true));
 }
 
 TEST(Mdrv2Helpers, FindProcessorModuleForCpuCoversSelectionCases)
@@ -2604,7 +2653,7 @@ TEST_F(Mdrv2Fixture, PrivateSystemInfoUpdateCustomPathRunsExactMatchBranch)
     std::remove(smbiosPath.c_str());
 }
 
-TEST_F(Mdrv2Fixture, PrivateSystemInfoUpdateReusesMotherboardMatchRule)
+TEST_F(Mdrv2Fixture, SystemInfoUpdateWaitsForMotherboardAnchor)
 {
     std::vector<uint8_t> blob = buildFullInventoryBlob();
     FakeObjectMapper mapper({}, {}, 0);
@@ -2629,7 +2678,66 @@ TEST_F(Mdrv2Fixture, PrivateSystemInfoUpdateReusesMotherboardMatchRule)
         GTEST_SKIP()
             << "shared fake ObjectMapper was answered by another parallel test";
     }
+    EXPECT_TRUE(mdr.tpms.empty());
+    EXPECT_EQ(mdr.system, nullptr);
+    EXPECT_TRUE(mdr.inventoryAnchorRetryPending);
+    EXPECT_EQ(mdr.inventoryAnchorRetryCount, 0u);
+
     EXPECT_NO_THROW(mdr.systemInfoUpdate());
+    EXPECT_TRUE(mdr.tpms.empty());
+    EXPECT_EQ(mdr.system, nullptr);
+    EXPECT_TRUE(mdr.inventoryAnchorRetryPending);
+    EXPECT_EQ(mdr.inventoryAnchorRetryCount, 0u);
+
+    boost::asio::steady_timer stopTimer(
+        *io, phosphor::smbios::MDRV2::inventoryAnchorRetryInterval +
+                 inventoryAnchorRetryTestSlack);
+    stopTimer.async_wait(
+        [this_io = io.get()](const boost::system::error_code&) {
+            this_io->stop();
+        });
+    io->restart();
+    io->run();
+    EXPECT_EQ(mdr.inventoryAnchorRetryCount, 1u);
+    EXPECT_TRUE(mdr.inventoryAnchorRetryPending);
+
+    (void)mdr.inventoryAnchorRetryTimer.cancel();
+    mdr.inventoryAnchorRetryPending = false;
+
+    mdr.inventoryAnchorRetryPending = true;
+    mdr.onInventoryAnchorRetry(boost::asio::error::fault);
+    EXPECT_FALSE(mdr.inventoryAnchorRetryPending);
+    EXPECT_EQ(mdr.inventoryAnchorRetryCount, 1u);
+
+    mdr.inventoryAnchorRetryCount =
+        phosphor::smbios::MDRV2::inventoryAnchorRetryLimit;
+    mdr.scheduleInventoryAnchorRetry();
+    EXPECT_TRUE(mdr.inventoryAnchorRetryExhausted);
+    EXPECT_FALSE(mdr.inventoryAnchorRetryPending);
+
+    // Once exhausted, repeated update attempts must remain quiescent until a
+    // matching inventory signal explicitly re-arms recovery.
+    mdr.scheduleInventoryAnchorRetry();
+    EXPECT_TRUE(mdr.inventoryAnchorRetryExhausted);
+    EXPECT_FALSE(mdr.inventoryAnchorRetryPending);
+    EXPECT_EQ(mdr.inventoryAnchorRetryCount,
+              phosphor::smbios::MDRV2::inventoryAnchorRetryLimit);
+
+    mapper.emitInterface(
+        "/xyz/openbmc_project/inventory/system/board/motherboard",
+        phosphor::smbios::systemInterface);
+    boost::asio::steady_timer recoveryStopTimer(*io,
+                                                inventoryAnchorRetryTestSlack);
+    recoveryStopTimer.async_wait(
+        [this_io = io.get()](const boost::system::error_code&) {
+            this_io->stop();
+        });
+    io->restart();
+    io->run();
+    EXPECT_FALSE(mdr.inventoryAnchorRetryExhausted);
+    EXPECT_FALSE(mdr.inventoryAnchorRetryPending);
+    EXPECT_EQ(mdr.inventoryAnchorRetryCount, 0u);
+    EXPECT_NE(mdr.system, nullptr);
     std::remove(smbiosPath.c_str());
 }
 
