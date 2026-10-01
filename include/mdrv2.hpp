@@ -39,6 +39,7 @@
 #include <sdbusplus/timer.hpp>
 #include <xyz/openbmc_project/Smbios/MDR_V2/server.hpp>
 
+#include <chrono>
 #include <filesystem>
 #include <memory>
 
@@ -116,7 +117,8 @@ class MDRV2 :
         sdbusplus::server::object_t<
             sdbusplus::server::xyz::openbmc_project::smbios::MDRV2>(
             *conn, objectPath.c_str()),
-        timer(*io), bus(conn), objServer(std::move(obj)),
+        timer(*io), inventoryAnchorRetryTimer(*io), bus(conn),
+        objServer(std::move(obj)),
         smbiosInterface(objServer->add_interface(placeGetRecordType(objectPath),
                                                  smbiosInterfaceName)),
         smbiosFilePath(std::move(filePath)),
@@ -207,6 +209,16 @@ class MDRV2 :
 
   private:
     boost::asio::steady_timer timer;
+    boost::asio::steady_timer inventoryAnchorRetryTimer;
+
+    static constexpr std::chrono::seconds inventoryAnchorRetryInterval{1};
+    static constexpr size_t inventoryAnchorRetryLimit = 30;
+    size_t inventoryAnchorRetryCount = 0;
+    bool inventoryAnchorRetryPending = false;
+    bool inventoryAnchorRetryExhausted = false;
+
+    void scheduleInventoryAnchorRetry();
+    void onInventoryAnchorRetry(boost::system::error_code ec);
 
     std::shared_ptr<sdbusplus::asio::connection> bus;
     std::shared_ptr<sdbusplus::asio::object_server> objServer;

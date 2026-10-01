@@ -188,6 +188,38 @@ TEST_F(Mdrv2Fixture, ConstructorWithMissingFileRunsMdrv2CodePaths)
     });
 }
 
+TEST_F(Mdrv2Fixture, InventoryAnchorRetryTerminalStatesAreQuiescent)
+{
+    auto objServer = std::make_shared<sdbusplus::asio::object_server>(conn);
+    phosphor::smbios::MDRV2 mdr(io, conn, objServer, "/nonexistent/smbios2",
+                                phosphor::smbios::defaultObjectPath,
+                                phosphor::smbios::defaultInventoryPath);
+
+    mdr.inventoryAnchorRetryPending = true;
+    mdr.scheduleInventoryAnchorRetry();
+    EXPECT_TRUE(mdr.inventoryAnchorRetryPending);
+
+    mdr.inventoryAnchorRetryPending = false;
+    mdr.inventoryAnchorRetryExhausted = true;
+    mdr.scheduleInventoryAnchorRetry();
+    EXPECT_FALSE(mdr.inventoryAnchorRetryPending);
+
+    mdr.inventoryAnchorRetryExhausted = false;
+    mdr.inventoryAnchorRetryCount =
+        phosphor::smbios::MDRV2::inventoryAnchorRetryLimit;
+    mdr.scheduleInventoryAnchorRetry();
+    EXPECT_TRUE(mdr.inventoryAnchorRetryExhausted);
+    EXPECT_FALSE(mdr.inventoryAnchorRetryPending);
+
+    mdr.inventoryAnchorRetryPending = true;
+    mdr.onInventoryAnchorRetry(boost::asio::error::operation_aborted);
+    EXPECT_FALSE(mdr.inventoryAnchorRetryPending);
+
+    mdr.inventoryAnchorRetryPending = true;
+    mdr.onInventoryAnchorRetry(boost::asio::error::fault);
+    EXPECT_FALSE(mdr.inventoryAnchorRetryPending);
+}
+
 TEST_F(Mdrv2Fixture, ConstructorWithCustomObjectPathRunsPlaceGetRecordTypePath)
 {
     auto objServer = std::make_shared<sdbusplus::asio::object_server>(conn);

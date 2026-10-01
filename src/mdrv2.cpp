@@ -24,7 +24,9 @@
 #include <sdbusplus/exception.hpp>
 #include <xyz/openbmc_project/Smbios/MDR_V2/error.hpp>
 
+#include <algorithm>
 #include <fstream>
+#include <functional>
 
 namespace phosphor
 {
@@ -396,6 +398,45 @@ uint8_t MDRV2::directoryEntries(uint8_t value)
         directoryEntries(value);
 }
 
+void MDRV2::scheduleInventoryAnchorRetry()
+{
+    if (inventoryAnchorRetryPending || inventoryAnchorRetryExhausted)
+    {
+        return;
+    }
+
+    if (inventoryAnchorRetryCount >= inventoryAnchorRetryLimit)
+    {
+        inventoryAnchorRetryExhausted = true;
+        lg2::error(
+            "Inventory anchor {I} did not become ready after {A} retries; SMBIOS inventory remains unpublished",
+            "I", smbiosInventoryPath, "A", inventoryAnchorRetryCount);
+        return;
+    }
+
+    inventoryAnchorRetryPending = true;
+    inventoryAnchorRetryTimer.expires_after(inventoryAnchorRetryInterval);
+    inventoryAnchorRetryTimer.async_wait(
+        std::bind_front(&MDRV2::onInventoryAnchorRetry, this));
+}
+
+void MDRV2::onInventoryAnchorRetry(boost::system::error_code ec)
+{
+    inventoryAnchorRetryPending = false;
+    if (ec)
+    {
+        if (ec != boost::asio::error::operation_aborted)
+        {
+            lg2::error("Inventory anchor retry timer failed: {E}", "E",
+                       ec.message());
+        }
+        return;
+    }
+
+    ++inventoryAnchorRetryCount;
+    systemInfoUpdate();
+}
+
 void MDRV2::systemInfoUpdate()
 {
 #ifndef PUBLISH_INVENTORY
@@ -405,10 +446,11 @@ void MDRV2::systemInfoUpdate()
     // /xyz/openbmc_project/inventory. Another service owns that subtree.
     return;
 #else
-    // By default, look for System interface on any system/board/* object
+    // By default, look for System interface on an inventory object.
     std::string mapperAncestorPath = smbiosInventoryPath;
     std::string matchParentPath = smbiosInventoryPath + "/board/";
     bool requireExactMatch = false;
+    bool requireChassisMatch = false;
 
     // If customized, look for System on only that custom object
     if (smbiosInventoryPath != defaultInventoryPath)
@@ -420,31 +462,59 @@ void MDRV2::systemInfoUpdate()
         matchParentPath = mapperAncestorPath;
         requireExactMatch = true;
     }
+#ifdef CUSTOM_DBUS_PATH
+    else
+    {
+        // Inventory objects are relocated below a discovered chassis when
+        // custom-dbus-path is enabled. Do not accept another object that also
+        // exposes Inventory.Item.System while the chassis is still starting.
+        matchParentPath = smbiosInventoryPath + "/chassis/";
+        requireChassisMatch = true;
+    }
+#endif
 
     std::string motherboardPath;
-    auto method = bus->new_method_call(mapperBusName, mapperPath,
-                                       mapperInterface, "GetSubTreePaths");
-    method.append(mapperAncestorPath);
-    method.append(0);
-
-    // If customized, also accept Board as anchor, not just System
     std::vector<std::string> desiredInterfaces{systemInterface};
+    // If an exact inventory path was supplied, also accept Board as anchor.
     if (requireExactMatch)
     {
         desiredInterfaces.emplace_back(boardInterface);
     }
-    method.append(desiredInterfaces);
 
     try
     {
-        std::vector<std::string> paths;
-        sdbusplus::message_t reply = bus->call(method);
-        reply.read(paths);
+        auto getSubTreePaths = [this, &mapperAncestorPath](
+                                   const std::vector<std::string>& interfaces) {
+            auto method = bus->new_method_call(
+                mapperBusName, mapperPath, mapperInterface, "GetSubTreePaths");
+            method.append(mapperAncestorPath);
+            method.append(0);
+            method.append(interfaces);
+
+            std::vector<std::string> result;
+            sdbusplus::message_t reply = bus->call(method);
+            reply.read(result);
+            return result;
+        };
+
+        std::vector<std::string> paths = getSubTreePaths(desiredInterfaces);
+        std::vector<std::string> chassisPaths;
+        if (requireChassisMatch)
+        {
+            chassisPaths = getSubTreePaths({chassisInterface});
+        }
 
         size_t pathsCount = paths.size();
         for (size_t i = 0; i < pathsCount; ++i)
         {
             if (requireExactMatch && (paths[i] != smbiosInventoryPath))
+            {
+                continue;
+            }
+
+            if (requireChassisMatch &&
+                std::find(chassisPaths.begin(), chassisPaths.end(), paths[i]) ==
+                    chassisPaths.end())
             {
                 continue;
             }
@@ -464,20 +534,17 @@ void MDRV2::systemInfoUpdate()
 
     if (motherboardPath.empty())
     {
-        lg2::error(
-            "Failed to get system motherboard dbus path. Setting up a match rule");
-
-        if (motherboardConfigMatch)
+        if (!motherboardConfigMatch)
         {
-            lg2::info("Motherboard match rule already exists");
-        }
-        else
-        {
+            lg2::info(
+                "Inventory anchor {I} is not ready; waiting before publishing SMBIOS inventory",
+                "I", smbiosInventoryPath);
             motherboardConfigMatch = std::make_unique<sdbusplus::bus::match_t>(
                 *bus,
                 sdbusplus::bus::match::rules::interfacesAdded() +
                     sdbusplus::bus::match::rules::argNpath(0, matchParentPath),
-                [this, requireExactMatch](sdbusplus::message_t& msg) {
+                [this, requireExactMatch,
+                 requireChassisMatch](sdbusplus::message_t& msg) {
                     sdbusplus::message::object_path objectName;
                     boost::container::flat_map<
                         std::string,
@@ -487,7 +554,14 @@ void MDRV2::systemInfoUpdate()
                     msg.read(objectName, msgData);
                     bool gotMatch = false;
 
-                    if (msgData.contains(systemInterface))
+                    if (requireChassisMatch &&
+                        msgData.contains(chassisInterface))
+                    {
+                        lg2::info("Successful match on chassis interface");
+                        gotMatch = true;
+                    }
+                    else if (!requireChassisMatch &&
+                             msgData.contains(systemInterface))
                     {
                         lg2::info("Successful match on system interface");
                         gotMatch = true;
@@ -503,18 +577,29 @@ void MDRV2::systemInfoUpdate()
 
                     if (gotMatch)
                     {
-                        // There is a race condition here: our desired interface
-                        // has just been created, triggering the D-Bus callback,
-                        // but Object Mapper has not been told of it yet. The
-                        // mapper must also add it. Stall for time, so it can.
-                        sleep(2);
+                        // Object Mapper may receive the new interface after
+                        // this signal. Retry immediately; systemInfoUpdate()
+                        // schedules bounded asynchronous retries if needed.
+                        if (inventoryAnchorRetryExhausted)
+                        {
+                            inventoryAnchorRetryCount = 0;
+                            inventoryAnchorRetryExhausted = false;
+                        }
                         systemInfoUpdate();
                     }
                 });
         }
+        // Wait for the configured inventory anchor instead of publishing at
+        // the fallback motherboard path.
+        scheduleInventoryAnchorRetry();
+        return;
     }
     else
     {
+        (void)inventoryAnchorRetryTimer.cancel();
+        inventoryAnchorRetryPending = false;
+        inventoryAnchorRetryCount = 0;
+        inventoryAnchorRetryExhausted = false;
 #ifdef ASSOC_TRIM_PATH
         // When enabled, chop off last component of motherboardPath, to trim one
         // layer, so that associations are built to the underlying chassis
