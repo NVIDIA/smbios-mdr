@@ -39,6 +39,28 @@ mdrv2_dep_sources = [
     '../src/nvidia_firmware_inventory.cpp',
 ]
 
+if get_option('publish-inventory').allowed()
+    test(
+        'test_inventory_anchor',
+        executable(
+            'test_inventory_anchor',
+            ['test_inventory_anchor.cpp'] + mdrv2_dep_sources,
+            cpp_args: cpp_args_smbios,
+            dependencies: [
+                gtest_main_dep,
+                gmock_dep,
+                boost_dep,
+                sdbusplus_dep,
+                phosphor_logging_dep,
+                phosphor_dbus_interfaces_dep,
+            ],
+            include_directories: [root_inc, test_inc],
+        ),
+        protocol: 'gtest',
+        is_parallel: false,
+    )
+endif
+
 foreach name : main_app_sources
     if name != 'mdrv2'
         if name == 'firmware_inventory'

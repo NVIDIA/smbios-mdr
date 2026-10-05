@@ -578,14 +578,14 @@ void MDRV2::systemInfoUpdate()
                     if (gotMatch)
                     {
                         // Object Mapper may receive the new interface after
-                        // this signal. Retry immediately; systemInfoUpdate()
-                        // schedules bounded asynchronous retries if needed.
+                        // this signal. Schedule a retry after returning from
+                        // this callback so it can safely retire the match.
                         if (inventoryAnchorRetryExhausted)
                         {
                             inventoryAnchorRetryCount = 0;
                             inventoryAnchorRetryExhausted = false;
                         }
-                        systemInfoUpdate();
+                        scheduleInventoryAnchorRetry();
                     }
                 });
         }
@@ -596,6 +596,9 @@ void MDRV2::systemInfoUpdate()
     }
     else
     {
+        // This match only waits for the initial anchor. Later chassis
+        // announcements must not rebuild already published SMBIOS objects.
+        motherboardConfigMatch.reset();
         (void)inventoryAnchorRetryTimer.cancel();
         inventoryAnchorRetryPending = false;
         inventoryAnchorRetryCount = 0;
