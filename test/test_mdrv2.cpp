@@ -2726,8 +2726,9 @@ TEST_F(Mdrv2Fixture, SystemInfoUpdateWaitsForMotherboardAnchor)
     mapper.emitInterface(
         "/xyz/openbmc_project/inventory/system/board/motherboard",
         phosphor::smbios::systemInterface);
-    boost::asio::steady_timer recoveryStopTimer(*io,
-                                                inventoryAnchorRetryTestSlack);
+    boost::asio::steady_timer recoveryStopTimer(
+        *io, phosphor::smbios::MDRV2::inventoryAnchorRetryInterval +
+                 inventoryAnchorRetryTestSlack);
     recoveryStopTimer.async_wait(
         [this_io = io.get()](const boost::system::error_code&) {
             this_io->stop();
