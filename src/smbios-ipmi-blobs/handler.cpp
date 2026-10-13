@@ -3,6 +3,7 @@
 #include "mdrv2.hpp"
 #include "smbios_mdrv2.hpp"
 
+#include <openssl/sha.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -14,10 +15,12 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <ctime>
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <string>
@@ -103,15 +106,53 @@ bool SmbiosBlobHandler::deleteBlob(const std::string& /* path */)
     return false;
 }
 
-bool SmbiosBlobHandler::stat(const std::string& path, struct BlobMeta* meta)
+bool SmbiosBlobHandler::stat(const std::string& path, struct BlobMeta* blobMeta)
 {
-    if (!blobPtr || blobPtr->blobId != path)
+    if (path != blobId)
     {
         return false;
     }
 
-    meta->size = blobPtr->buffer.size();
-    meta->blobState = blobPtr->state;
+    if (blobPtr)
+    {
+        blobMeta->size = blobPtr->buffer.size();
+        blobMeta->blobState = blobPtr->state;
+        blobMeta->metadata.clear();
+        return true;
+    }
+
+    /* No session: report the persisted table. Missing/corrupt file =
+     * Size=0 ("resend"); a stat FAILURE only means old FW. */
+    blobMeta->size = 0;
+    blobMeta->blobState = 0;
+    blobMeta->metadata.clear();
+
+    /* Single read, then validate what was actually read: keeps every
+     * rejection branch reachable and immune to size/read races. */
+    std::ifstream smbiosFile(smbiosFilePath, std::ios_base::binary);
+    std::vector<uint8_t> data(std::istreambuf_iterator<char>(smbiosFile), {});
+    if ((data.size() <= sizeof(MDRSMBIOSHeader)) ||
+        (data.size() > (sizeof(MDRSMBIOSHeader) + maxBufferSize)))
+    {
+        return true;
+    }
+
+    MDRSMBIOSHeader mdrHdr;
+    std::memcpy(&mdrHdr, data.data(), sizeof(mdrHdr));
+    if ((mdrHdr.dirVer != mdrDirVersion) || (mdrHdr.mdrType != mdrTypeII) ||
+        (mdrHdr.dataSize != (data.size() - sizeof(MDRSMBIOSHeader))))
+    {
+        return true;
+    }
+
+    /* Metadata carries the SHA-256 of the table payload (MDR header
+     * excluded) so the host can skip the transfer on a hash match. */
+    blobMeta->metadata.resize(SHA256_DIGEST_LENGTH);
+    SHA256(data.data() + sizeof(MDRSMBIOSHeader), mdrHdr.dataSize,
+           blobMeta->metadata.data());
+
+    blobMeta->size = mdrHdr.dataSize;
+    blobMeta->blobState = blobs::StateFlags::committed;
     return true;
 }
 
@@ -294,15 +335,16 @@ bool SmbiosBlobHandler::close(uint16_t session)
     return true;
 }
 
-bool SmbiosBlobHandler::stat(uint16_t session, struct BlobMeta* meta)
+bool SmbiosBlobHandler::stat(uint16_t session, struct BlobMeta* blobMeta)
 {
     if (!blobPtr || blobPtr->sessionId != session)
     {
         return false;
     }
 
-    meta->size = blobPtr->buffer.size();
-    meta->blobState = blobPtr->state;
+    blobMeta->size = blobPtr->buffer.size();
+    blobMeta->blobState = blobPtr->state;
+    blobMeta->metadata.clear();
     return true;
 }
 

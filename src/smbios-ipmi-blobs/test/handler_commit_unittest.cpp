@@ -150,10 +150,18 @@ TEST_F(SmbiosBlobHandlerCommitTest, ExpireClosesAnOpenSession)
     EXPECT_FALSE(handler.stat(session, &meta));
 }
 
-TEST_F(SmbiosBlobHandlerCommitTest, PathStatWithNoOpenBlobFails)
+TEST_F(SmbiosBlobHandlerCommitTest, PathStatWithNoOpenBlobSizeZero)
 {
-    // stat(path) returns false when no blob is open (blobPtr is null).
-    EXPECT_FALSE(handler.stat(expectedBlobId, &meta));
+    // No open blob and no persisted table: stat succeeds with Size=0.
+    const auto noFile =
+        std::filesystem::temp_directory_path() / "smbios2-commit-ut-none";
+    std::filesystem::remove(noFile);
+    handler.setSmbiosFilePath(noFile.string());
+
+    blobs::BlobMeta statMeta;
+    EXPECT_TRUE(handler.stat(expectedBlobId, &statMeta));
+    EXPECT_EQ(statMeta.size, 0u);
+    EXPECT_TRUE(statMeta.metadata.empty());
 }
 
 TEST_F(SmbiosBlobHandlerCommitTest, PathStatWithMismatchedPathFails)
